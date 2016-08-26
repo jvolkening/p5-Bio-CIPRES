@@ -1,0 +1,6 @@
+.travis.yml
+Build.PL
+Changes
+lib/Bio/CIPRES.pm
+lib/Bio/t.pl
+MANIFEST			This list of files
