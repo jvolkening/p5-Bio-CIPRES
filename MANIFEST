@@ -1,6 +1,11 @@
-.travis.yml
 Build.PL
 Changes
+demo/clean.pl
+demo/dl.pl
+demo/foo.pl
+demo/list.pl
+demo/run.pl
 lib/Bio/CIPRES.pm
-lib/Bio/t.pl
+lib/Bio/CIPRES/Job.pm
+lib/Bio/CIPRES/Output.pm
 MANIFEST			This list of files

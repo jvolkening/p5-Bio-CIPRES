@@ -6,9 +6,13 @@ use warnings;
 
 use Carp;
 use Config::Tiny;
+use List::Util qw/first/;
 use LWP;
 use URI;
 use URI::Escape;
+use XML::LibXML;
+
+use Bio::CIPRES::Job;
 
 our $VERSION = 0.001;
 our $UA      = 'Bio::CIPRES';
@@ -39,7 +43,6 @@ sub new {
         'cipres-appkey' => $self->{cfg}->{app_id}
     );
     my $netloc = join ':', $self->{uri}->host, $self->{uri}->port;
-    warn "NL: $netloc\n";
     $self->{agent}->credentials(
         $netloc,
         'Cipres Authentication',
@@ -98,31 +101,104 @@ sub list_jobs {
 
     my ($self) = @_;
 
-    my $res = $self->{agent}->get("$self->{uri}/job/$self->{cfg}->{user}");
-    print $res->code, "\n";
-    print $res->content;
+    my $xml = $self->_get(
+        "$self->{uri}/job/$self->{cfg}->{user}?expand=true"
+    );
+
+    my $dom = XML::LibXML->load_xml('string' => $xml);
+    return map {
+        Bio::CIPRES::Job->new( parent => $self, dom => $_ )
+    } $dom->findnodes('/joblist/jobs/jobstatus');
+
+}
+
+sub get_job_by_handle {
+
+    my ($self, $handle) = @_;
+    my @jobs = $self->list_jobs;
+    return first {$_->{status}->{handle} eq $handle} @jobs;
+
+}
+
+sub _delete {
+
+    my ($self, $url) = @_;
+
+    my $res = $self->{agent}->delete( $url )
+        or croak "Error deleting from $url: $@";
+
+    croak "Network error: " . $res->status_line . "\n"
+        if (! $res->is_success);
+
+    return;
+
+}
+
+sub _download {
+
+    my ($self, $url, $tgt) = @_;
+
+    my $res = $self->{agent}->get( $url, ':content_file' => $tgt )
+        or croak "Error fetching file from $url: $@";
+
+    # Is there a better way to do this? Above succeeds even if file cannot be
+    # written.
+    croak "Error saving file to disk" if (! -e $tgt);
+
+    croak "Network error: " . $res->status_line . "\n"
+        if (! $res->is_success);
+
+    return $res->content;
+
+}
+
+
+sub _get {
+
+    my ($self, $url) = @_;
+
+    my $res = $self->{agent}->get( $url )
+        or croak "Error fetching file from $url: $@";
+
+    croak "Network error: " . $res->status_line . "\n"
+        if (! $res->is_success);
+
+    return $res->content;
+
+}
+
+sub _post {
+
+    my ($self, $url, @args) = @_;
+
+    my $res = $self->{agent}->post(
+        $url,
+        [ @args ],
+        'content_type' => 'form-data',
+    ) or croak "Error POSTing to $url: $@";
+
+    croak "Network error: " . $res->status_line . "\n"
+        if (! $res->is_success);
+
+    return $res->content;
 
 }
 
 sub submit_job {
 
-    my ($self, $tool, $file, $id, $name, $email) = @_;
+    my ($self, @args) = @_;
 
-    my $res = $self->{agent}->post(
+    my $xml = $self->_post(
         "$self->{uri}/job/$self->{cfg}->{user}",
-        {
-            'tool'          => $tool,
-            'input.infile_' => $file,
-            'metadata.clientJobId' => $id,
-            'metadata.clientJobName' => $name,
-            'metadata.clientToolName' => "FOO $tool",
-            'metadata.statusEmail' => 'true',
-            'metadata.emailAddress' => $email,
-        },
-        'content_type' => 'form-data',
+        @args,
     );
-    print $res->code;
-    print $res->content;
+
+    print $xml;
+    my $dom = XML::LibXML->load_xml('string' => $xml);
+    return Bio::CIPRES::Job->new(
+        parent => $self,
+        dom    => $dom,
+    );
 
 }
 
