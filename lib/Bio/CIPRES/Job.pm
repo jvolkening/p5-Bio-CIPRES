@@ -10,7 +10,7 @@ use overload
 use Carp;
 use DateTime::Format::RFC3339;
 use XML::LibXML;
-use Data::Dumper;
+use Scalar::Util qw/blessed weaken/;
 
 use Bio::CIPRES::Output;
 
@@ -23,8 +23,10 @@ sub new {
     my $self = bless {}, $class;
 
     croak "Must define job parent" if (! defined $args{parent});
+    croak "Parent must be a Bio::CIPRES object"
+        if ( blessed($args{parent}) ne 'Bio::CIPRES' );
     $self->{parent} = $args{parent};
-    #TODO: check that $parent is of class BIO::CIPRES
+    weaken( $self->{parent} );
 
     croak "Must define initial status" if (! defined $args{dom});
     $self->_parse_status( $args{dom} );
@@ -103,7 +105,7 @@ sub list_output {
     my $dom = XML::LibXML->load_xml( string => $xml );
 
     return map {
-        Bio::CIPRES::Output->new( parent => $self, dom => $_ )
+        Bio::CIPRES::Output->new( dom => $_ )
     } $dom->findnodes('/results/jobfiles/jobfile');
 
 }
@@ -118,15 +120,15 @@ sub download {
 
     for (@results) {
         next if ( defined $args{group} && $_->{group} ne $args{group} );
-        next if ( defined $args{name } && $_->{name}  ne $args{name}  );
-        my $outfile = $_->{name};
+        next if ( defined $args{name } && $_->{filename}  ne $args{filename}  );
+        my $outfile = $_->{filename};
         $outfile = "$args{dir}/$outfile" if (defined $args{dir});
         warn "saving $_->{url_download} to $outfile\n";
         my $res = $self->{parent}->_download(
             $_->{url_download},
             $outfile,
         );
-        push @saved, $_->{name};
+        push @saved, $_->{filename};
     }
 
     return @saved;
@@ -139,15 +141,14 @@ sub exit_code {
 
     my @results = $self->list_output;
     for (@results) {
-        next if ($_->{name} ne 'term.txt');
+        next if ($_->{filename} ne 'done.txt');
         my $content = $self->{parent}->_get(
             $_->{url_download}
         );
-        if ($content =~ /^ExitCode=(\d+)/m) {
+        if ($content =~ /^retval=(\d+)$/m) {
             return $1;
         }
     }
-
     return undef;
        
 }
@@ -158,7 +159,7 @@ sub stdout {
 
     my @results = $self->list_output;
     for (@results) {
-        next if ($_->{name} ne 'STDOUT');
+        next if ($_->{filename} ne 'STDOUT');
         return $self->{parent}->_get(
             $_->{url_download}
         );
@@ -173,7 +174,7 @@ sub stderr {
 
     my @results = $self->list_output;
     for (@results) {
-        next if ($_->{name} ne 'STDERR');
+        next if ($_->{filename} ne 'STDERR');
         return $self->{parent}->_get(
             $_->{url_download}
         );

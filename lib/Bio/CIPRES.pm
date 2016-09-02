@@ -13,6 +13,7 @@ use URI::Escape;
 use XML::LibXML;
 
 use Bio::CIPRES::Job;
+use Bio::CIPRES::Error;
 
 our $VERSION = 0.001;
 our $UA      = 'Bio::CIPRES';
@@ -101,11 +102,11 @@ sub list_jobs {
 
     my ($self) = @_;
 
-    my $xml = $self->_get(
+    my $res = $self->_get(
         "$self->{uri}/job/$self->{cfg}->{user}?expand=true"
     );
 
-    my $dom = XML::LibXML->load_xml('string' => $xml);
+    my $dom = XML::LibXML->load_xml('string' => $res);
     return map {
         Bio::CIPRES::Job->new( parent => $self, dom => $_ )
     } $dom->findnodes('/joblist/jobs/jobstatus');
@@ -127,7 +128,7 @@ sub _delete {
     my $res = $self->{agent}->delete( $url )
         or croak "Error deleting from $url: $@";
 
-    croak "Network error: " . $res->status_line . "\n"
+    die Bio::CIPRES::Error->new( $res->content )
         if (! $res->is_success);
 
     return;
@@ -145,7 +146,7 @@ sub _download {
     # written.
     croak "Error saving file to disk" if (! -e $tgt);
 
-    croak "Network error: " . $res->status_line . "\n"
+    die Bio::CIPRES::Error->new( $res->content )
         if (! $res->is_success);
 
     return $res->content;
@@ -160,7 +161,7 @@ sub _get {
     my $res = $self->{agent}->get( $url )
         or croak "Error fetching file from $url: $@";
 
-    croak "Network error: " . $res->status_line . "\n"
+    die Bio::CIPRES::Error->new( $res->content )
         if (! $res->is_success);
 
     return $res->content;
@@ -177,7 +178,7 @@ sub _post {
         'content_type' => 'form-data',
     ) or croak "Error POSTing to $url: $@";
 
-    croak "Network error: " . $res->status_line . "\n"
+    die Bio::CIPRES::Error->new( $res->content )
         if (! $res->is_success);
 
     return $res->content;
@@ -188,13 +189,12 @@ sub submit_job {
 
     my ($self, @args) = @_;
 
-    my $xml = $self->_post(
+    my $res = $self->_post(
         "$self->{uri}/job/$self->{cfg}->{user}",
         @args,
     );
 
-    print $xml;
-    my $dom = XML::LibXML->load_xml('string' => $xml);
+    my $dom = XML::LibXML->load_xml('string' => $res);
     return Bio::CIPRES::Job->new(
         parent => $self,
         dom    => $dom,

@@ -16,10 +16,6 @@ sub new {
 
     my $self = bless {}, $class;
 
-    croak "Must define job parent" if (! defined $args{parent});
-    $self->{parent} = $args{parent};
-    #TODO: check that $parent is of class BIO::CIPRES
-
     croak "Must define initial status" if (! defined $args{dom});
     $self->_parse_dom( $args{dom} );
 
@@ -27,6 +23,11 @@ sub new {
 
 
 }
+
+sub size  { return $_[0]->{length}       };
+sub url   { return $_[0]->{url_download} };
+sub name  { return $_[0]->{filename}     };
+sub group { return $_[0]->{group}        };
 
 sub _parse_dom {
 
@@ -37,7 +38,7 @@ sub _parse_dom {
     $dom = $c if ($c->nodeName eq 'jobfile');
 
     $self->{handle}       = $dom->findvalue('jobHandle');
-    $self->{name}         = $dom->findvalue('filename');
+    $self->{filename}     = $dom->findvalue('filename');
     $self->{length}       = $dom->findvalue('length');
     $self->{group}        = $dom->findvalue('parameterName');
     $self->{url_download} = $dom->findvalue('downloadUri/url');
