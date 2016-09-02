@@ -6,7 +6,7 @@ use warnings;
 use Bio::CIPRES;
 
 my $u = Bio::CIPRES->new(
-    conf => '.cipres',
+    conf => "$ENV{HOME}/.cipres",
 );
 
 my $job = $u->get_job_by_handle($ARGV[0]);
@@ -25,11 +25,15 @@ my $exit_code = $job->exit_code;
 warn "E: $exit_code\n";
 if ($exit_code == 0) {
    
-    my $e = $job->stderr;
-    print "STDERR:\n$e\n";
-    my $o = $job->stdout;
-    print "STDOUT:\n$o\n";
-    my @saved = $job->download(group => 'aligfile', dir => '/home/jeremy/Downloads');
+    open my $se, '>', "$ARGV[1]/STDERR_FOO";
+    print {$se} $job->stderr;
+    close $se;
+
+    open my $so, '>', "$ARGV[1]/STDOUT_FOO";
+    print {$so} $job->stdout;
+    close $so;
+
+    my @saved = $job->download(dir => $ARGV[1]);
     print "S: $_\n" for (@saved);
 
 }
