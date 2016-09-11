@@ -239,3 +239,65 @@ sub _parse_status {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Bio::CIPRES::Job - A class reprsenting a single CIPRES job
+
+=head1 SYNOPSIS
+
+    use Bio::CIPRES;
+
+    my $ua = Bio::CIPRES->new(%args);
+
+    my $job = $ua->submit
+
+=head1 DESCRIPTION
+
+C<Bio::CIPRES::Error> is a simple error class for the CIPRES API. It's purpose
+is to parse the XML error report returned by CIPRES and provide an object that
+can be used in different contexts. In boolean contexts it always returns a
+false value, in string context it returns a textual summary of the error, and
+in numeric context it returns the error code.
+
+This class does not contain any methods (including the constructor) intended
+to be called by the end user. It's functionality is encoded in it's overload
+behavior is described above.
+
+=head1 METHODS
+
+None
+
+=head1 CAVEATS AND BUGS
+
+This is code is in alpha testing stage and the API is not guaranteed to be
+stable.
+
+Please reports bugs to the author.
+
+=head1 AUTHOR
+
+Jeremy Volkening <jdv@base2bio.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2016 Jeremy Volkening
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see <http://www.gnu.org/licenses/>.
+
+=cut
+
+
