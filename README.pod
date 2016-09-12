@@ -7,10 +7,29 @@ Bio::CIPRES - interface to the CIPRES REST API
     use Bio::CIPRES;
 
     my $ua = Bio::CIPRES->new(
-        conf => "$ENV{HOME}/.cipres",
+        user    => $username,
+        pass    => $password,
+        app_id  => $id,
+        timeout => 60,
     );
 
-    my $job = $ua->submit_job( @params );
+    my $job = $ua->submit_job( %job_params );
+
+    while (! $job->is_finished) {
+        sleep $job->poll_interval;
+        $job->refresh_status;
+    }
+
+    if ($job->exit_code == 0) {
+
+        print STDOUT $job->stdout;
+        print STDERR $job->stderr;
+        for my $file ($job->list_outputs) {
+            $file->download( $file->name );
+        }
+
+    }
+    
 
 =head1 DESCRIPTION
 
@@ -25,9 +44,33 @@ user (check L<SEE ALSO> for links to tool documentation).
 
 =item B<new>
 
-    my $ua = Bio::CIPRES->new( %args );
+    my $ua = Bio::CIPRES->new(
+        user    => $username,
+        pass    => $password,
+        app_id  => $id,
+        timeout => 60,
+    );
 
-Create a new C<Bio::CIPRES> object.
+    # or read configuration from file
+
+    my $ua = Bio::CIPRES->new(
+        conf => "$ENV{HOME}/.cipres"
+    );
+
+Create a new C<Bio::CIPRES> object. There are three required parameters:
+username (C<user>), passphrase (C<pass>), and application ID (C<app_id>).
+These can either be passed in on the constructor or read in from a
+configuration file, as demonstrated above. The configuration file should
+contain key=value pairs, one pair per line, as in:
+
+    user=foo
+    pass=bar
+    app_id=foo_bar_baz
+
+The passphrase must be stored in plaintext, so the usual precautions apply
+(e.g. the file should not be world-readable). If possible, find another way to
+retrieve the passphrase within your code and pass it in directly as a method
+argument.
 
 =item B<submit_job>
 

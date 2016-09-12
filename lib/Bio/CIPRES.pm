@@ -198,10 +198,11 @@ Bio::CIPRES - interface to the CIPRES REST API
         $job->refresh_status;
     }
 
+    print STDOUT $job->stdout;
+    print STDERR $job->stderr;
+
     if ($job->exit_code == 0) {
 
-        print STDOUT $job->stdout;
-        print STDERR $job->stderr;
         for my $file ($job->list_outputs) {
             $file->download( $file->name );
         }
