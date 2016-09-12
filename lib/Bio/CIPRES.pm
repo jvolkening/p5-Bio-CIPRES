@@ -17,9 +17,11 @@ use Bio::CIPRES::Error;
 
 our $VERSION = 0.001;
 our $UA      = 'Bio::CIPRES';
+our $SERVER  = 'cipresrest.sdsc.edu';
+our $API     = 'cipresrest/v1';
 
 my %defaults = (
-    url     => 'https://cipresrest.sdsc.edu/cipresrest/v1/',
+    url     => "https://$SERVER/$API/",
     timeout => 60,
     user    => undef,
     pass    => undef,
@@ -108,7 +110,7 @@ sub list_jobs {
 
     my $dom = XML::LibXML->load_xml('string' => $res);
     return map {
-        Bio::CIPRES::Job->new( parent => $self, dom => $_ )
+        Bio::CIPRES::Job->new( agent => $self->{agent}, dom => $_ )
     } $dom->findnodes('/joblist/jobs/jobstatus');
 
 }
@@ -120,39 +122,6 @@ sub get_job_by_handle {
     return first {$_->{status}->{handle} eq $handle} @jobs;
 
 }
-
-sub _delete {
-
-    my ($self, $url) = @_;
-
-    my $res = $self->{agent}->delete( $url )
-        or croak "Error deleting from $url: $@";
-
-    die Bio::CIPRES::Error->new( $res->content )
-        if (! $res->is_success);
-
-    return;
-
-}
-
-sub _download {
-
-    my ($self, $url, $tgt) = @_;
-
-    my $res = $self->{agent}->get( $url, ':content_file' => $tgt )
-        or croak "Error fetching file from $url: $@";
-
-    # Is there a better way to do this? Above succeeds even if file cannot be
-    # written.
-    croak "Error saving file to disk" if (! -e $tgt);
-
-    die Bio::CIPRES::Error->new( $res->content )
-        if (! $res->is_success);
-
-    return $res->content;
-
-}
-
 
 sub _get {
 
@@ -196,7 +165,7 @@ sub submit_job {
 
     my $dom = XML::LibXML->load_xml('string' => $res);
     return Bio::CIPRES::Job->new(
-        parent => $self,
+        agent => $self->{agent},
         dom    => $dom,
     );
 
@@ -237,6 +206,32 @@ user (check L<SEE ALSO> for links to tool documentation).
     my $ua = Bio::CIPRES->new( %args );
 
 Create a new C<Bio::CIPRES> object.
+
+=item B<submit_job>
+
+    my $job = $ua->submit_job( %params );
+
+Submit a new job to the CIPRES service. Params are set based on the tool
+documentation (not covered here). Returns a L<Bio::CIPRES::Job> object.
+
+=item B<list_jobs>
+
+    for my $job ( $ua->list_jobs ) {
+        # do something
+    }
+
+Returns an array of L<Bio::CIPRES::Job> objects representing jobs in the
+user's workspace.
+
+=item B<get_job_by_handle>
+
+    my $job = $ua->get_job_by_handle( $job_handle );
+
+Takes a single argument (string containing the job handle/ID) and returns a
+L<Bio::CIPRES::Job> object representing the appropriate job, or undef if not
+found.
+
+=back
 
 =head1 CAVEATS AND BUGS
 

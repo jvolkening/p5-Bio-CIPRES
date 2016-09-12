@@ -6,7 +6,7 @@ use warnings;
 use Bio::CIPRES;
 
 my $u = Bio::CIPRES->new(
-    conf => "$ENV{HOME}/.cipres",
+    conf => $ARGV[0] // "$ENV{HOME}/.cipres",
 );
 
 my @jobs = $u->list_jobs;

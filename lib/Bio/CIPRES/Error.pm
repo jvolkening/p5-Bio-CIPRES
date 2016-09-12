@@ -6,26 +6,44 @@ use strict;
 use warnings;
 
 use overload
-    'bool'   => sub {return 0},
     '0+'     => sub {return $_[0]->{code}},
-    '""'     => \&stringify,
+    '""'     => \&_stringify,
     fallback => 1;
 
 use Carp;
+use Exporter qw/import/;
 use XML::LibXML;
 
 # Error codes
-use constant AUTHORIZATION     => 1;
-use constant AUTHENTICATION    => 2;
-use constant NOT_FOUND         => 4;
-use constant FORM_VALIDATION   => 5;
-use constant USER_MISMATCH     => 6;
-use constant BAD_REQUEST       => 7;
-use constant GENERIC_SVC_ERR   => 100;
-use constant GENERIC_COMM_ERR  => 101;
-use constant BAD_INVOCATION    => 102;
-use constant USAGE_LIMT        => 103;
-use constant DISABLED_RESOURCE => 104;
+use constant ERR_AUTHORIZATION     => 1;
+use constant ERR_AUTHENTICATION    => 2;
+use constant ERR_NOT_FOUND         => 4;
+use constant ERR_FORM_VALIDATION   => 5;
+use constant ERR_USER_MISMATCH     => 6;
+use constant ERR_BAD_REQUEST       => 7;
+use constant ERR_GENERIC_SVC_ERR   => 100;
+use constant ERR_GENERIC_COMM_ERR  => 101;
+use constant ERR_BAD_INVOCATION    => 102;
+use constant ERR_USAGE_LIMIT       => 103;
+use constant ERR_DISABLED_RESOURCE => 104;
+
+our @EXPORT_OK = qw/
+    ERR_AUTHORIZATION
+    ERR_AUTHENTICATION
+    ERR_NOT_FOUND
+    ERR_FORM_VALIDATION
+    ERR_USER_MISMATCH
+    ERR_BAD_REQUEST
+    ERR_GENERIC_SVC_ERR
+    ERR_GENERIC_COMM_ERR
+    ERR_BAD_INVOCATION
+    ERR_USAGE_LIMIT
+    ERR_DISABLED_RESOURCE
+/;
+
+our %EXPORT_TAGS = (
+    'constants' => \@EXPORT_OK,
+);
 
 sub new {
 
@@ -39,7 +57,7 @@ sub new {
 
 }
 
-sub stringify {
+sub _stringify {
 
     my ($self) = @_;
 
@@ -84,8 +102,6 @@ sub _parse_xml {
     return;
 
 }
-
-sub is_error { return 1; }
 
 1;
 

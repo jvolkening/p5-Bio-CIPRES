@@ -6,7 +6,7 @@ use warnings;
 use Bio::CIPRES;
 
 my $u = Bio::CIPRES->new(
-    conf => "$ENV{HOME}/.cipres",
+    conf => $ARGV[2] // "$ENV{HOME}/.cipres",
 );
 
 my $job = $u->get_job_by_handle($ARGV[0]);
@@ -22,8 +22,7 @@ while (! $job->is_finished) {
 }
 
 my $exit_code = $job->exit_code;
-warn "E: $exit_code\n";
-if ($exit_code == 0) {
+if (! defined $exit_code || $exit_code == 0) {
    
     open my $se, '>', "$ARGV[1]/STDERR_FOO";
     print {$se} $job->stderr;
@@ -33,7 +32,12 @@ if ($exit_code == 0) {
     print {$so} $job->stdout;
     close $so;
 
-    my @saved = $job->download(dir => $ARGV[1]);
+    my @saved;
+    for ($job->list_output) {
+        my $out = "$ARGV[1]/" . $_->name;
+        push @saved, $out;
+        $_->download(out => $out);
+    }
     print "S: $_\n" for (@saved);
 
 }

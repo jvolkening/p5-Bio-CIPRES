@@ -9,4 +9,5 @@
 /MYMETA*
 /pm_to_blib
 *.tar.gz
+*.bak
 releases

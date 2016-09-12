@@ -13,9 +13,17 @@ my $builder = Module::Build->new(
     },
     build_requires => {
         'Test::More' => 0,
+        'Net::Ping'  => 0,
     },
     requires => {
-        'HTTP::Tiny'   => 0,
+        'Config::Tiny' => 0,
+        'List::Util'   => 0,
+        'Scalar::Util' => 0,
+        'LWP'          => 0,
+        'URI'          => 0,
+        'URI::Escape'  => 0,
+        'XML::LibXML'  => 0,
+        'DateTime::Format::RFC3339' => 0,
     },
     meta_merge => {
         resources => {

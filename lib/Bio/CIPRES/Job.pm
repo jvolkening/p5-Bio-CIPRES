@@ -1,4 +1,4 @@
-package Bio::CIPRES::Job;
+package Bio::CIPRES::Job 0.001;
 
 use 5.012;
 use strict;
@@ -8,13 +8,14 @@ use overload
     '""' => sub {return $_[0]->{status}->{handle}};
 
 use Carp;
-use DateTime::Format::RFC3339;
+use Time::Piece;
 use XML::LibXML;
 use Scalar::Util qw/blessed weaken/;
+use List::Util qw/first/;
 
 use Bio::CIPRES::Output;
+use Bio::CIPRES::Error;
 
-our $VERSION = 0.001;
 
 sub new {
 
@@ -22,11 +23,11 @@ sub new {
 
     my $self = bless {}, $class;
 
-    croak "Must define job parent" if (! defined $args{parent});
-    croak "Parent must be a Bio::CIPRES object"
-        if ( blessed($args{parent}) ne 'Bio::CIPRES' );
-    $self->{parent} = $args{parent};
-    weaken( $self->{parent} );
+    croak "Must define user agent" if (! defined $args{agent});
+    croak "Agent must be an LWP::UserAgent object"
+        if ( blessed($args{agent}) ne 'LWP::UserAgent' );
+    $self->{agent} = $args{agent};
+    weaken( $self->{agent} );
 
     croak "Must define initial status" if (! defined $args{dom});
     $self->_parse_status( $args{dom} );
@@ -40,10 +41,15 @@ sub delete {
 
     my ($self) = @_;
 
-    return $self->{parent}->_delete( $self->{status}->{url_status} );
+    my $res = $self->{agent}->delete( $self->{status}->{url_status} )
+        or croak "LWP internal error: $@";
+
+    die Bio::CIPRES::Error->new( $res->content )
+        if (! $res->is_success);
+
+    return 1;
 
 }
-
 
 sub is_finished {
 
@@ -74,10 +80,11 @@ sub stage {
     #
     # so we follow their advice.
 
+    map {$_->{timestamp} =~ s/(\d\d)\:(\d\d)$/$1$2/}
+        @{ $self->{status}->{messages} };
+
     my @sorted = sort {
-        DateTime::Format::RFC3339->parse_datetime( $a->{timestamp} )
-        <=>
-        DateTime::Format::RFC3339->parse_datetime( $b->{timestamp} )
+        $a->{timestamp} <=> $b->{timestamp}
     } @{ $self->{status}->{messages} };
 
     return $sorted[-1]->{stage};
@@ -88,24 +95,39 @@ sub refresh_status {
 
     my ($self) = @_;
 
-    my $u = $self->{parent};
-    my $xml = $u->_get( $self->{status}->{url_status} );
+    my $xml = $self->_get( $self->{status}->{url_status} );
     my $dom = XML::LibXML->load_xml( string => $xml );
 
     $self->_parse_status($dom);
 
 }
 
-sub list_output {
+sub _get {
+
+    my ($self, $url) = @_;
+
+    my $res = $self->{agent}->get( $url )
+        or croak "LWP internal error: $@";
+
+    die Bio::CIPRES::Error->new( $res->content )
+        if (! $res->is_success);
+
+    return $res->content;
+
+}
+
+sub list_outputs {
 
     my ($self) = @_;
 
-    my $u = $self->{parent};
-    my $xml = $u->_get( $self->{status}->{url_results} );
+    my $xml = $self->_get( $self->{status}->{url_results} );
     my $dom = XML::LibXML->load_xml( string => $xml );
 
     return map {
-        Bio::CIPRES::Output->new( dom => $_ )
+        Bio::CIPRES::Output->new(
+            agent => $self->{agent},
+            dom   => $_,
+        )
     } $dom->findnodes('/results/jobfiles/jobfile');
 
 }
@@ -115,40 +137,38 @@ sub download {
 
     my ($self, %args) = @_;
 
-    my @results = $self->list_output;
+    my @results = $self->list_outputs;
     my @saved = ();
 
-    for (@results) {
-        next if ( defined $args{group} && $_->{group} ne $args{group} );
-        next if ( defined $args{name } && $_->{filename}  ne $args{filename}  );
-        my $outfile = $_->{filename};
+    for my $file (@results) {
+        next if ( defined $args{group} && $file->group ne $args{group} );
+        next if ( defined $args{name } && $file->name  ne $args{filename}  );
+        my $outfile = $file->name;
         $outfile = "$args{dir}/$outfile" if (defined $args{dir});
-        warn "saving $_->{url_download} to $outfile\n";
-        my $res = $self->{parent}->_download(
-            $_->{url_download},
-            $outfile,
+        warn "saving " . $file->url . " to $outfile\n";
+        my $res = $file->download(
+            out => $outfile,
         );
-        push @saved, $_->{filename};
+        push @saved, $file->name;
     }
 
     return @saved;
-       
+    
 }
 
 sub exit_code {
 
     my ($self) = @_;
 
-    my @results = $self->list_output;
-    for (@results) {
-        next if ($_->{filename} ne 'done.txt');
-        my $content = $self->{parent}->_get(
-            $_->{url_download}
-        );
-        if ($content =~ /^retval=(\d+)$/m) {
-            return $1;
-        }
+    my $file = first {$_->name eq 'done.txt'} $self->list_outputs;
+
+    return undef if (! defined $file);
+
+    my $content = $file->download;
+    if ($content =~ /^retval=(\d+)$/m) {
+        return $1;
     }
+    
     return undef;
        
 }
@@ -157,30 +177,22 @@ sub stdout {
 
     my ($self) = @_;
 
-    my @results = $self->list_output;
-    for (@results) {
-        next if ($_->{filename} ne 'STDOUT');
-        return $self->{parent}->_get(
-            $_->{url_download}
-        );
-    }
-    return undef;
-       
+    my $file = first {$_->name eq 'STDOUT'} $self->list_outputs;
+
+    return undef if (! defined $file);
+    return $file->download;
+    
 }
 
 sub stderr {
 
     my ($self) = @_;
 
-    my @results = $self->list_output;
-    for (@results) {
-        next if ($_->{filename} ne 'STDERR');
-        return $self->{parent}->_get(
-            $_->{url_download}
-        );
-    }
-    return undef;
-       
+    my $file = first {$_->name eq 'STDERR'} $self->list_outputs;
+
+    return undef if (! defined $file);
+    return $file->download;
+    
 }
 
 sub _parse_status {
@@ -208,8 +220,10 @@ sub _parse_status {
 
     # parse messages
     for my $msg ($dom->findnodes('messages/message')) {
+        my $t = $msg->findvalue('timestamp');
+        $t =~ s/(\d\d):(\d\d)$/$1$2/;
         my $ref = {
-            timestamp => $msg->findvalue('timestamp'),
+            timestamp => Time::Piece->strptime($t, "%Y-%m-%dT%H:%M:%S%z"),
             stage     => $msg->findvalue('stage'),
             text      => $msg->findvalue('text'),
         };
@@ -244,31 +258,90 @@ __END__
 
 =head1 NAME
 
-Bio::CIPRES::Job - A class reprsenting a single CIPRES job
+Bio::CIPRES::Job - a CIPRES job
 
 =head1 SYNOPSIS
 
     use Bio::CIPRES;
 
-    my $ua = Bio::CIPRES->new(%args);
-
-    my $job = $ua->submit
+    my $ua  = Bio::CIPRES->new( %args );
+    my $job = $ua->submit( %params );
 
 =head1 DESCRIPTION
 
-C<Bio::CIPRES::Error> is a simple error class for the CIPRES API. It's purpose
-is to parse the XML error report returned by CIPRES and provide an object that
-can be used in different contexts. In boolean contexts it always returns a
-false value, in string context it returns a textual summary of the error, and
-in numeric context it returns the error code.
+C<Bio::CIPRES::Job> is a class representing a single CIPRES job. It's purpose
+is to simplify handling of job status and job outputs.
 
-This class does not contain any methods (including the constructor) intended
-to be called by the end user. It's functionality is encoded in it's overload
-behavior is described above.
+Users should not create C<Bio::CIPRES::Job> objects directly - they are
+returned by methods in the L<Bio::CIPRES> class.
 
 =head1 METHODS
 
-None
+=over 4
+
+=item B<delete>
+
+    $job->delete;
+
+Deletes a job from the user workspace, including all of the output files.
+Generally this should be called once a job is completed and all desired output
+files have been fetched. This will help to keep the user workspace clean.
+
+=item B<is_finished>
+
+    if ($job->is_finished) {}
+
+Returns true if the job has completed, false otherwise.
+
+=item B<poll_interval>
+
+    my $s = $job->poll_interval;
+
+Returns the minimum number of seconds that the client should wait between
+status updates. Generally this is called as part of a while loop.
+
+=item B<stage>
+
+    if ($job->stage eq 'COMPLETED') {}
+
+Returns a string describing the current stage of the job.
+
+=item B<refresh_status>
+
+    $job->refresh_status;
+
+Makes a call to the API to retrieve the current status of the job, and updates
+the object attributes accordingly. Generally this is called as part of a while
+loop while waiting for a job to complete.
+
+=item B<list_outputs>
+
+    for my $output ($job->list_outputs) {}
+
+Returns an array of L<Bio::CIPRES::Output> objects representing files
+generated by the job. Generally this should only be called after a job has
+completed.
+
+=item B<exit_code>
+
+Returns the actual exit code of the job on the remote server. Exit codes < 0
+indicate API or server errors, while exit codes > 0 indicate errors in the job
+tool itself (possibly described in the tool's documentation).
+
+=item B<stdout>
+
+Returns the STDOUT from the job as a string.
+
+=item B<stderr>
+
+Returns the STDERR from the job as a string.
+
+=item B<download>
+
+Currently deprecated and undocumented (use L<Bio::CIPRES::Output::download>
+instead).
+
+=back
 
 =head1 CAVEATS AND BUGS
 

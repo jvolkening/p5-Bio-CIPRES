@@ -6,7 +6,9 @@ use warnings;
 
 use Carp;
 use XML::LibXML;
-use Data::Dumper;
+use Scalar::Util qw/blessed weaken/;
+
+use Bio::CIPRES::Error;
 
 our $VERSION = 0.001;
 
@@ -15,6 +17,12 @@ sub new {
     my ($class, %args) = @_;
 
     my $self = bless {}, $class;
+
+    croak "Must define user agent" if (! defined $args{agent});
+    croak "Agent must be an LWP::UserAgent object"
+        if ( blessed($args{agent}) ne 'LWP::UserAgent' );
+    $self->{agent} = $args{agent};
+    weaken( $self->{agent} );
 
     croak "Must define initial status" if (! defined $args{dom});
     $self->_parse_dom( $args{dom} );
@@ -28,6 +36,37 @@ sub size  { return $_[0]->{length}       };
 sub url   { return $_[0]->{url_download} };
 sub name  { return $_[0]->{filename}     };
 sub group { return $_[0]->{group}        };
+
+sub download {
+
+    my ($self, %args) = @_;
+
+    my $res;
+
+    if (defined $args{out}) {
+
+        $res = $self->{agent}->get(
+            $self->url,
+            ':content_file' => $args{out},
+        ) or croak "LWP internal error: $@";
+
+        croak "Error saving file to disk" if (! -e $args{out});
+
+    }
+
+    else {
+
+        $res = $self->{agent}->get( $self->url )
+            or croak "LWP internal error: $@";
+
+    }
+
+    die Bio::CIPRES::Error->new( $res->content )
+        if (! $res->is_success);
+
+    return $res->decoded_content;
+
+}
 
 sub _parse_dom {
 
@@ -51,3 +90,105 @@ sub _parse_dom {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Bio::CIPRES::Output - a single CIPRES job output file
+
+=head1 SYNOPSIS
+
+    for my $output ($job->list_outputs) {
+
+        print "filename:", $output->name, "\n";
+        print "BIG FILE!!\n" if ($output->size > 1024**3);
+        print "group:", $output->group, "\n";
+
+        # get content
+        my $content = $output->download;
+
+        # or save directly to disk
+        $output->download( 'out' => $output_filename );
+
+    }
+
+=head1 DESCRIPTION
+
+C<Bio::CIPRES::Output> objects represent single output files produced by a job
+run. Methods allow for querying simple file attributes and downloading the
+file to memory or disk.
+
+Objects of this class should not be created directly - they are returned by
+methods calls to L<Bio::CIPRES::Job> objects.
+
+=head1 METHODS
+
+=over 4
+
+=item B<name>
+
+    my $fn = $output->name;
+
+Returns the filename of the output as provided by the API.
+
+=item B<size>
+
+    my $bytes = $output->size;
+
+Returns the size of the output file in bytes.
+
+=item B<group>
+
+    my $group = $output->group;
+
+Returns the output group that the file is a member of.
+
+=item B<url>
+
+    my $url = $output->url;
+
+Returns the retrieval URL for the file. Typically this is not needed as the
+C<download> method will handle everything for you.
+
+=item B<download>
+
+    my $content = $output->download
+    my $res = $output->download( 'out' => $filename );
+
+Attempts to download the output file, and either returns the contents (if no
+arguments are given) or saves them to disk (if the 'out' argument is provided
+with a valid output filename). Throws an exception on any error - this will be
+an object of type L<Bio::CIPRES::Error> if the error occurs on the server
+end.
+
+=back
+
+=head1 CAVEATS AND BUGS
+
+Please report bugs to the author.
+
+=head1 AUTHOR
+
+Jeremy Volkening <jdv@base2bio.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2016 Jeremy Volkening
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see <http://www.gnu.org/licenses/>.
+
+=cut
+
+
