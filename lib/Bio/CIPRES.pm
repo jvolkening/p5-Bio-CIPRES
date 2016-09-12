@@ -23,9 +23,9 @@ our $API     = 'cipresrest/v1';
 my %defaults = (
     url     => "https://$SERVER/$API/",
     timeout => 60,
+    app_id  => 'cipres_perl-E9B8D52FA2A54472BF13F25E4CD957D4',
     user    => undef,
     pass    => undef,
-    app_id  => undef,
 );
 
 sub new {

@@ -30,11 +30,11 @@ SKIP: {
     ok ($@->isa('Bio::CIPRES::Error'), "returned Bio::CIPRES::Error object");
     ok ($@ == ERR_AUTHENTICATION, "exception was ERR_AUTHENTICATION");
 
+    skip "No valid credentials available" if (! -r "$ENV{HOME}/.cipres");
+
     # Good (testing) credentials
     $ua = Bio::CIPRES->new(
-        user   => 'pycipres_eu',
-        pass   => 'test',
-        app_id => 'pycipres-6D6543FD83B44FBB81CE7655C9464458',
+        conf => "$ENV{HOME}/.cipres",
     );
 
     my $job = $ua->submit_job(
