@@ -38,11 +38,9 @@ SKIP: {
     );
 
     my $job = $ua->submit_job(
-        'tool'                => 'READSEQ',
-        'input.infile_'       => ">test_seq\nAATGCC",
+        'tool'                => 'CLUSTALW',
+        'input.infile_'       => ">test_seq_1\nAATGCC\n>test_seq_2\nAAATGCG\n",
         'vparam.runtime_'     => '0.5',
-        'vparam.input_type_'  => '8',  # FASTA
-        'vparam.output_type_' => '13', # RAW
     );
     ok ($job->isa('Bio::CIPRES::Job'), "returned Bio::CIPRES::Job object");
 
@@ -53,13 +51,14 @@ SKIP: {
 
     ok ($job->stage eq 'COMPLETED', "returned expected job stage");
 
-    my $result = first {$_->name eq 'outfile.txt'} $job->list_outputs;
+    ok ($job->exit_code == 0, "job return expected exit status");
+
+    my $result = first {$_->name eq 'infile.aln' && $_->group eq 'aligfile'} $job->list_outputs;
     ok ($result->isa('Bio::CIPRES::Output'), "returned Bio::CIPRES::Output object");
-    ok ($result->size == 8, "output correct size");
-    ok ($result->group eq 'outputfile_plain', "output correct group");
+    ok ($result->size == 119, "output correct size");
 
     my $contents = $result->download;
-    ok ($contents =~ /^AATGCC/, "returned expected job output");
+    ok ($contents =~ /^test_seq_2\s+AAAT/mi, "returned expected job output");
 
     ok ($job->delete, "job deleted without error");
 }

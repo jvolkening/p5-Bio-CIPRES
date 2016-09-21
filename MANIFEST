@@ -14,3 +14,5 @@ t/manifest.t
 t/pod-coverage.t
 t/pod.t
 LICENSE
+META.yml
+META.json
