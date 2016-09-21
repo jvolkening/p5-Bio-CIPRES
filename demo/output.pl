@@ -11,7 +11,7 @@ my $u = Bio::CIPRES->new(
 
 my $job = $u->get_job_by_handle($ARGV[0]);
 
-for ( $job->list_output ) {
+for ( $job->list_outputs ) {
     print join( "\t",    
         $_->name,
         $_->group,
