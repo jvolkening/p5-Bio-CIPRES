@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use overload
-    '""' => sub {return $_[0]->{status}->{handle}};
+    '""' => sub {return $_[0]->{handle}};
 
 use Carp;
 use Time::Piece;
@@ -34,14 +34,13 @@ sub new {
 
     return $self;
 
-
 }
 
 sub delete {
 
     my ($self) = @_;
 
-    my $res = $self->{agent}->delete( $self->{status}->{url_status} )
+    my $res = $self->{agent}->delete( $self->{url_status} )
         or croak "LWP internal error: $@";
 
     die Bio::CIPRES::Error->new( $res->content )
@@ -51,27 +50,20 @@ sub delete {
 
 }
 
-sub is_finished {
-
-    my ($self) = @_;
-
-    return $self->{status}->{is_terminal} =~ /^true$/i ? 1 : 0;
-
-}
-
-sub poll_interval {
-
-    my ($self) = @_;
-
-    return $self->{status}->{delay};
-
-}
+sub is_finished   { return $_[0]->{is_finished} }
+sub is_failed     { return $_[0]->{is_failed}   }
+sub poll_interval { return $_[0]->{poll_secs}   }
+sub submit_time   { return $_[0]->{submit_time} }
 
 sub stage {
 
     my ($self) = @_;
 
-    # The docs say:
+    # Should be as easy as this:
+
+    # return $self->{stage};
+
+    # But the docs say:
     #
     # "Unfortunately, the current version of CIPRES sets
     # jobstatus.jobStage in a way that's somewhat inconsistent and difficult
@@ -81,24 +73,95 @@ sub stage {
     # so we follow their advice.
 
     map {$_->{timestamp} =~ s/(\d\d)\:(\d\d)$/$1$2/}
-        @{ $self->{status}->{messages} };
+        @{ $self->{messages} };
 
     my @sorted = sort {
         $a->{timestamp} <=> $b->{timestamp}
-    } @{ $self->{status}->{messages} };
+    } @{ $self->{messages} };
 
     return $sorted[-1]->{stage};
 
 }
 
-sub refresh_status {
+sub refresh {
 
     my ($self) = @_;
 
-    my $xml = $self->_get( $self->{status}->{url_status} );
+    my $xml = $self->_get( $self->{url_status} );
     my $dom = XML::LibXML->load_xml( string => $xml );
-
     $self->_parse_status($dom);
+
+    return 1;
+
+}
+
+sub outputs {
+
+    my ($self, %args) = @_;
+
+    # download values if necessary
+    if ($args{force_download} || ! defined $self->{outputs}) {
+        my $xml = $self->_get( $self->{url_results} );
+        my $dom = XML::LibXML->load_xml( string => $xml );
+
+        $self->{outputs} = [ map {
+            Bio::CIPRES::Output->new( agent => $self->{agent}, dom  => $_ )
+        } $dom->findnodes('/results/jobfiles/jobfile') ];
+    }
+
+    return grep {
+        (! defined $args{group} || $_->group eq $args{group} ) &&
+        (! defined $args{name}  || $_->name  eq $args{name}  )
+    } @{ $self->{outputs} };
+   
+}
+
+sub exit_code {
+
+    my ($self) = @_;
+
+    my ($file) = $self->outputs(name => 'done.txt');
+
+    return undef if (! defined $file);
+
+    my $content = $file->download;
+    if ($content =~ /^retval=(\d+)$/m) {
+        return $1;
+    }
+    
+    return undef;
+       
+}
+
+sub stdout {
+
+    my ($self) = @_;
+    my ($file) = $self->outputs(name => 'STDOUT');
+    return defined $file ? $file->download : undef;
+    
+}
+
+sub stderr {
+
+    my ($self) = @_;
+    my ($file) = $self->outputs(name => 'STDERR');
+    return defined $file ? $file->download : undef;
+    
+}
+
+sub wait {
+
+    my ($self, $timeout) = @_;
+
+    $timeout //= -1;
+
+    my $start = time;
+    while (! $self->is_finished) {
+        sleep $self->poll_interval;
+        $self->refresh;
+        return 0 if (time - $start > $timeout);
+    }
+    return 1;
 
 }
 
@@ -116,90 +179,11 @@ sub _get {
 
 }
 
-sub list_outputs {
-
-    my ($self) = @_;
-
-    my $xml = $self->_get( $self->{status}->{url_results} );
-    my $dom = XML::LibXML->load_xml( string => $xml );
-
-    return map {
-        Bio::CIPRES::Output->new(
-            agent => $self->{agent},
-            dom   => $_,
-        )
-    } $dom->findnodes('/results/jobfiles/jobfile');
-
-}
-
-
-sub download {
-
-    my ($self, %args) = @_;
-
-    my @results = $self->list_outputs;
-    my @saved = ();
-
-    for my $file (@results) {
-        next if ( defined $args{group} && $file->group ne $args{group} );
-        next if ( defined $args{name } && $file->name  ne $args{filename}  );
-        my $outfile = $file->name;
-        $outfile = "$args{dir}/$outfile" if (defined $args{dir});
-        warn "saving " . $file->url . " to $outfile\n";
-        my $res = $file->download(
-            out => $outfile,
-        );
-        push @saved, $file->name;
-    }
-
-    return @saved;
-    
-}
-
-sub exit_code {
-
-    my ($self) = @_;
-
-    my $file = first {$_->name eq 'done.txt'} $self->list_outputs;
-
-    return undef if (! defined $file);
-
-    my $content = $file->download;
-    if ($content =~ /^retval=(\d+)$/m) {
-        return $1;
-    }
-    
-    return undef;
-       
-}
-
-sub stdout {
-
-    my ($self) = @_;
-
-    my $file = first {$_->name eq 'STDOUT'} $self->list_outputs;
-
-    return undef if (! defined $file);
-    return $file->download;
-    
-}
-
-sub stderr {
-
-    my ($self) = @_;
-
-    my $file = first {$_->name eq 'STDERR'} $self->list_outputs;
-
-    return undef if (! defined $file);
-    return $file->download;
-    
-}
-
 sub _parse_status {
 
     my ($self, $dom) = @_;
 
-    my $s   = {};
+    my $s = {};
 
     # remove outer tag if necessary
     my $c = $dom->firstChild;
@@ -209,11 +193,11 @@ sub _parse_status {
     $s->{url_status}  = $dom->findvalue('selfUri/url');
     $s->{url_results} = $dom->findvalue('resultsUri/url');
     $s->{url_working} = $dom->findvalue('workingDirUri/url');
-    $s->{delay}       = $dom->findvalue('minPollIntervalSeconds');
-    $s->{is_terminal} = $dom->findvalue('terminalStage');
+    $s->{poll_secs}   = $dom->findvalue('minPollIntervalSeconds');
+    $s->{is_finished} = $dom->findvalue('terminalStage') =~ /^true$/i ? 1 : 0;
     $s->{is_failed}   = $dom->findvalue('failed');
     $s->{stage}       = $dom->findvalue('jobStage');
-    $s->{submitted}   = $dom->findvalue('dateSubmitted');
+    $s->{submit_time} = $dom->findvalue('dateSubmitted');
 
     # check for missing values
     map {length $s->{$_} || croak "Missing value for $_\n"} keys %$s;
@@ -246,9 +230,9 @@ sub _parse_status {
         $s->{meta}->{$key} = $val;
     }
 
-    $self->{status} = $s;
+    $self->{$_} = $s->{$_} for (keys %$s);
 
-    return;
+    return 1;
 
 }
 
@@ -293,6 +277,15 @@ files have been fetched. This will help to keep the user workspace clean.
 
 Returns true if the job has completed, false otherwise.
 
+=item B<is_failed>
+
+    die "CIPRES error" if ($job->is_failed);
+
+Returns true if the submission has failed, false otherwise. Note that, according to
+the API docs, this value can be false even if the job itself has failed for
+some reason. Use L<Bio::CIPRES::Job::exit_code> for a more reliable way to
+check for job success.
+
 =item B<poll_interval>
 
     my $s = $job->poll_interval;
@@ -306,21 +299,52 @@ status updates. Generally this is called as part of a while loop.
 
 Returns a string describing the current stage of the job.
 
-=item B<refresh_status>
+=item B<refresh>
 
-    $job->refresh_status;
+    $job->refresh;
 
 Makes a call to the API to retrieve the current status of the job, and updates
 the object attributes accordingly. Generally this is called as part of a while
 loop while waiting for a job to complete.
 
-=item B<list_outputs>
+=item B<wait>
 
-    for my $output ($job->list_outputs) {}
+    $job->wait($timeout) or die "Timeout waiting for job to finish";
+
+Enters a blocking loop waiting for the job to finish. Takes a single optional
+argument of the maximum number of seconds to wait before timing out (default:
+no timeout). Returns true if the job finishes or false if the wait times out.
+
+=item B<outputs>
+
+    my @results = $job->outputs(
+        name  => 'foo.txt',
+        group => 'bar',
+        force_download => 0,
+    );
 
 Returns an array of L<Bio::CIPRES::Output> objects representing files
 generated by the job. Generally this should only be called after a job has
-completed.
+completed. By default returns all available outputs. Possible arguments
+include:
+
+=over 2
+
+=item group
+
+Limit returned outputs to those in the specified group
+
+=item name
+
+Limit returned output to that with the specified name
+
+=item force_download
+
+Force the client to re-download output list (as opposed to using cached
+values). This is automatically called from within L<Bio::CIPRES::Job::refresh> and
+generally doesn't need to be set by the user. (default: false)
+
+=back
 
 =item B<exit_code>
 
@@ -336,17 +360,13 @@ Returns the STDOUT from the job as a string.
 
 Returns the STDERR from the job as a string.
 
-=item B<download>
+=item B<submit_time>
 
-Currently deprecated and undocumented (use L<Bio::CIPRES::Output::download>
-instead).
+Returns the original submission date/time as a Time::Piece object
 
 =back
 
 =head1 CAVEATS AND BUGS
-
-This is code is in alpha testing stage and the API is not guaranteed to be
-stable.
 
 Please reports bugs to the author.
 

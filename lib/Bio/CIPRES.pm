@@ -19,6 +19,7 @@ our $VERSION = 0.001;
 our $UA      = 'Bio::CIPRES';
 our $SERVER  = 'cipresrest.sdsc.edu';
 our $API     = 'cipresrest/v1';
+our $DOMAIN  = 'Cipres Authentication';
 
 my %defaults = (
     url     => "https://$SERVER/$API/",
@@ -33,7 +34,7 @@ sub new {
     my ($class, %args) = @_;
     my $self = bless {}, $class;
 
-    # parse arguments from file or constructor
+    # parse properties from file or constructor
     $self->_parse_args(%args);
 
     # setup user agent
@@ -48,13 +49,12 @@ sub new {
     my $netloc = join ':', $self->{uri}->host, $self->{uri}->port;
     $self->{agent}->credentials(
         $netloc,
-        'Cipres Authentication',
+        $DOMAIN,
         $self->{cfg}->{user},
         $self->{cfg}->{pass}
     );
 
     return $self;
-
 
 }
 
@@ -64,9 +64,9 @@ sub _parse_args {
     my ($fn_cfg) = delete $args{conf};
 
     # set defaults
-    $self->{cfg} = {%defaults};
+    $self->{cfg} = {%defaults}; # copy, don't reference!
 
-    # read from config file if asked
+    # read from config file if asked, overwriting defaults
     if (defined $fn_cfg) {
         croak "Invalid or missing configuration file specified"
             if (! -e $fn_cfg);
@@ -77,26 +77,28 @@ sub _parse_args {
 
     }
 
-    # read fields from constructor, overwriting if present
-    $self->{cfg}->{$_} = $args{$_}
-        for (keys %args);
+    # read parameters from constructor, overwriting if present
+    $self->{cfg}->{$_} = $args{$_} for (keys %args);
 
-    # check that all fields are valid and defined
+    # check that all defined fields are valid
     my @extra = grep {! exists $defaults{$_}} keys %{ $self->{cfg} };
     croak "Unexpected config variables found (@extra) -- check syntax"
         if (scalar @extra);
+
+    # check that all required fields are defined
     my @missing = grep {! defined $self->{cfg}->{$_}} keys %defaults;
     croak "Required config variables missing (@missing) -- check syntax"
         if (scalar @missing);
 
     # TODO: further parameter validation ???
-    
-    $self->{cfg}->{user} =  uri_escape( $self->{cfg}->{user} );
-    $self->{cfg}->{pass} =  uri_escape( $self->{cfg}->{pass} );
+  
+    # Do necessary url-encoding
+    for (qw/user pass/) {
+        $self->{cfg}->{$_} =  uri_escape( $self->{cfg}->{$_} );
+    }
    
     # add auth info to string
-    my $uri = URI->new( $self->{cfg}->{url} );
-    $self->{uri} = $uri;
+    $self->{uri} = URI->new( $self->{cfg}->{url} );
 
 }
 
@@ -115,11 +117,35 @@ sub list_jobs {
 
 }
 
-sub get_job_by_handle {
+sub get_job {
 
     my ($self, $handle) = @_;
-    my @jobs = $self->list_jobs;
-    return first {$_->{status}->{handle} eq $handle} @jobs;
+    my $res = $self->_get(
+        "$self->{uri}/job/$self->{cfg}->{user}/$handle"
+    );
+
+    my $dom = XML::LibXML->load_xml('string' => $res);
+    return Bio::CIPRES::Job->new(
+        agent => $self->{agent},
+        dom   => $dom,
+    );
+
+}
+
+sub submit_job {
+
+    my ($self, @args) = @_;
+
+    my $res = $self->_post(
+        "$self->{uri}/job/$self->{cfg}->{user}",
+        @args,
+    );
+
+    my $dom = XML::LibXML->load_xml('string' => $res);
+    return Bio::CIPRES::Job->new(
+        agent => $self->{agent},
+        dom   => $dom,
+    );
 
 }
 
@@ -151,23 +177,6 @@ sub _post {
         if (! $res->is_success);
 
     return $res->content;
-
-}
-
-sub submit_job {
-
-    my ($self, @args) = @_;
-
-    my $res = $self->_post(
-        "$self->{uri}/job/$self->{cfg}->{user}",
-        @args,
-    );
-
-    my $dom = XML::LibXML->load_xml('string' => $res);
-    return Bio::CIPRES::Job->new(
-        agent => $self->{agent},
-        dom    => $dom,
-    );
 
 }
 
@@ -267,9 +276,9 @@ documentation (not covered here). Returns a L<Bio::CIPRES::Job> object.
 Returns an array of L<Bio::CIPRES::Job> objects representing jobs in the
 user's workspace.
 
-=item B<get_job_by_handle>
+=item B<get_job>
 
-    my $job = $ua->get_job_by_handle( $job_handle );
+    my $job = $ua->get_job( $job_handle );
 
 Takes a single argument (string containing the job handle/ID) and returns a
 L<Bio::CIPRES::Job> object representing the appropriate job, or undef if not
@@ -278,6 +287,11 @@ found.
 =back
 
 =head1 CAVEATS AND BUGS
+
+This is code is in alpha testing stage and the API is not guaranteed to be
+stable.
+
+Currently the use of UMBRELLA authentication is not implemented.
 
 Please report bugs to the author.
 

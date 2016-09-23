@@ -43,17 +43,14 @@ SKIP: {
         'vparam.runtime_'     => '0.5',
     );
     ok ($job->isa('Bio::CIPRES::Job'), "returned Bio::CIPRES::Job object");
-
-    while (! $job->is_finished) {
-        sleep $job->poll_interval;
-        $job->refresh_status;
-    }
+    
+    ok ($job->wait(600), "wait() returned true");
 
     ok ($job->stage eq 'COMPLETED', "returned expected job stage");
 
     ok ($job->exit_code == 0, "job return expected exit status");
 
-    my $result = first {$_->name eq 'infile.aln' && $_->group eq 'aligfile'} $job->list_outputs;
+    my ($result) = $job->outputs(name => 'infile.aln', group => 'aligfile');
     ok ($result->isa('Bio::CIPRES::Output'), "returned Bio::CIPRES::Output object");
     ok ($result->size == 119, "output correct size");
 

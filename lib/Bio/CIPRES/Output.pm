@@ -10,8 +10,6 @@ use Scalar::Util qw/blessed weaken/;
 
 use Bio::CIPRES::Error;
 
-our $VERSION = 0.001;
-
 sub new {
 
     my ($class, %args) = @_;
@@ -33,7 +31,6 @@ sub new {
 }
 
 sub size  { return $_[0]->{length}       };
-sub url   { return $_[0]->{url_download} };
 sub name  { return $_[0]->{filename}     };
 sub group { return $_[0]->{group}        };
 
@@ -41,25 +38,14 @@ sub download {
 
     my ($self, %args) = @_;
 
-    my $res;
+    my @a = $self->{url_download};
+    push @a, ':content_file', $args{out}
+        if (defined $args{out});
 
-    if (defined $args{out}) {
-
-        $res = $self->{agent}->get(
-            $self->url,
-            ':content_file' => $args{out},
-        ) or croak "LWP internal error: $@";
-
-        croak "Error saving file to disk" if (! -e $args{out});
-
-    }
-
-    else {
-
-        $res = $self->{agent}->get( $self->url )
-            or croak "LWP internal error: $@";
-
-    }
+    my $res = $self->{agent}->get(@a)
+        or croak "LWP internal error: $@";
+    croak "Error saving file to disk"
+        if (defined $args{out} && ! -e $args{out});
 
     die Bio::CIPRES::Error->new( $res->content )
         if (! $res->is_success);
@@ -143,13 +129,6 @@ Returns the size of the output file in bytes.
     my $group = $output->group;
 
 Returns the output group that the file is a member of.
-
-=item B<url>
-
-    my $url = $output->url;
-
-Returns the retrieval URL for the file. Typically this is not needed as the
-C<download> method will handle everything for you.
 
 =item B<download>
 
