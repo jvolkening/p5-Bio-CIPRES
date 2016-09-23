@@ -81,3 +81,4 @@
 \bBio-CIPRES-[\d\.\_]+
 
 ^demo
+^.travis.yml

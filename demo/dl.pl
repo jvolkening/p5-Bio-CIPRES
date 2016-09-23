@@ -9,17 +9,11 @@ my $u = Bio::CIPRES->new(
     conf => $ARGV[2] // "$ENV{HOME}/.cipres",
 );
 
-my $job = $u->get_job_by_handle($ARGV[0]);
+my $job = $u->get_job($ARGV[0]);
 
 print 'STATUS: ', $job->stage, "\n";
 
-while (! $job->is_finished) {
-   
-    sleep $job->poll_interval;
-    $job->refresh_status;
-    print 'STATUS: ', $job->stage, "\n";
-
-}
+$job->wait(6000) or die "Wait timeout";
 
 my $exit_code = $job->exit_code;
 if (! defined $exit_code || $exit_code == 0) {
@@ -33,7 +27,7 @@ if (! defined $exit_code || $exit_code == 0) {
     close $so;
 
     my @saved;
-    for ($job->list_output) {
+    for ($job->outputs) {
         my $out = "$ARGV[1]/" . $_->name;
         push @saved, $out;
         $_->download(out => $out);
