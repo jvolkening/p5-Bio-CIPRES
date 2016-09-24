@@ -15,7 +15,7 @@ use XML::LibXML;
 use Bio::CIPRES::Job;
 use Bio::CIPRES::Error;
 
-our $VERSION = 0.001;
+our $VERSION = 0.002;
 our $UA      = 'Bio::CIPRES';
 our $SERVER  = 'cipresrest.sdsc.edu';
 our $API     = 'cipresrest/v1';
@@ -204,7 +204,7 @@ Bio::CIPRES - interface to the CIPRES REST API
 
     while (! $job->is_finished) {
         sleep $job->poll_interval;
-        $job->refresh_status;
+        $job->refresh;
     }
 
     print STDOUT $job->stdout;
@@ -212,8 +212,8 @@ Bio::CIPRES - interface to the CIPRES REST API
 
     if ($job->exit_code == 0) {
 
-        for my $file ($job->list_outputs) {
-            $file->download( $file->name );
+        for my $file ($job->outputs) {
+            $file->download( out => $file->name );
         }
 
     }
@@ -266,6 +266,22 @@ argument.
 
 Submit a new job to the CIPRES service. Params are set based on the tool
 documentation (not covered here). Returns a L<Bio::CIPRES::Job> object.
+
+Most params are passed as simple key => value pairs of strings based on the
+CIPRES tool documentation. B<One important nuance>, however, is in the
+handling of input files. If the contents of a input file are to be passed in
+as a scalar, they should be provided directly as the scalar value to the
+appropriate key:
+
+    my $job = $ua->submit_job( 'input.infile_' => $in_contents );
+
+However, if the input file is to be uploaded by filename, it should be passed
+as an array reference:
+
+    my $job = $ua->submit_job( 'input.infile_' => [$in_filename] );
+
+Failure to understand the difference will result in errors either during job
+submission or during the job run.
 
 =item B<list_jobs>
 

@@ -242,18 +242,27 @@ __END__
 
 =head1 NAME
 
-Bio::CIPRES::Job - a CIPRES job
+Bio::CIPRES::Job - a CIPRES job class
 
 =head1 SYNOPSIS
 
     use Bio::CIPRES;
 
     my $ua  = Bio::CIPRES->new( %args );
-    my $job = $ua->submit( %params );
+    my $job = $ua->submit_job( %params );
+
+    $job->wait(6000) or die "Timeout waiting for job completion";
+
+    warn "Job returned non-zero status" if ($job->exit_code != 0);
+
+    print STDOUT $job->stdout;
+    print STDERR $job->stderr;
+
+    $job->delete;
 
 =head1 DESCRIPTION
 
-C<Bio::CIPRES::Job> is a class representing a single CIPRES job. It's purpose
+C<Bio::CIPRES::Job> is a class representing a single CIPRES job. Its purpose
 is to simplify handling of job status and job outputs.
 
 Users should not create C<Bio::CIPRES::Job> objects directly - they are
@@ -263,13 +272,19 @@ returned by methods in the L<Bio::CIPRES> class.
 
 =over 4
 
-=item B<delete>
+=item B<stage>
 
-    $job->delete;
+    if ($job->stage eq 'QUEUE') {}
 
-Deletes a job from the user workspace, including all of the output files.
-Generally this should be called once a job is completed and all desired output
-files have been fetched. This will help to keep the user workspace clean.
+Returns a string describing the current stage of the job.
+
+=item B<refresh>
+
+    $job->refresh;
+
+Makes a call to the API to retrieve the current status of the job, and updates
+the object attributes accordingly. Generally this is called as part of a while
+loop while waiting for a job to complete.
 
 =item B<is_finished>
 
@@ -292,20 +307,6 @@ check for job success.
 
 Returns the minimum number of seconds that the client should wait between
 status updates. Generally this is called as part of a while loop.
-
-=item B<stage>
-
-    if ($job->stage eq 'COMPLETED') {}
-
-Returns a string describing the current stage of the job.
-
-=item B<refresh>
-
-    $job->refresh;
-
-Makes a call to the API to retrieve the current status of the job, and updates
-the object attributes accordingly. Generally this is called as part of a while
-loop while waiting for a job to complete.
 
 =item B<wait>
 
@@ -330,15 +331,15 @@ include:
 
 =over 2
 
-=item group
+=item  * group
 
 Limit returned outputs to those in the specified group
 
-=item name
+=item  * name
 
 Limit returned output to that with the specified name
 
-=item force_download
+=item  * force_download
 
 Force the client to re-download output list (as opposed to using cached
 values). This is automatically called from within L<Bio::CIPRES::Job::refresh> and
@@ -348,21 +349,36 @@ generally doesn't need to be set by the user. (default: false)
 
 =item B<exit_code>
 
+    warn "Job returned non-zero status" if ($job->exit_code != 0);
+
 Returns the actual exit code of the job on the remote server. Exit codes < 0
 indicate API or server errors, while exit codes > 0 indicate errors in the job
 tool itself (possibly described in the tool's documentation).
 
 =item B<stdout>
 
+    print STDOUT $job->stdout;
+
 Returns the STDOUT from the job as a string.
 
 =item B<stderr>
+
+    print STDERR $job->stderr;
 
 Returns the STDERR from the job as a string.
 
 =item B<submit_time>
 
 Returns the original submission date/time as a Time::Piece object
+
+
+=item B<delete>
+
+    $job->delete;
+
+Deletes a job from the user workspace, including all of the output files.
+Generally this should be called once a job is completed and all desired output
+files have been fetched. This will help to keep the user workspace clean.
 
 =back
 

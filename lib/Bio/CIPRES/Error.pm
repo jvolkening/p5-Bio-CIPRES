@@ -109,35 +109,67 @@ __END__
 
 =head1 NAME
 
-Bio::CIPRES::Error - A simple error object for the CIPRES API
+Bio::CIPRES::Error - A simple error class for the CIPRES API
 
 =head1 SYNOPSIS
 
-    use Bio::CIPRES;
+    use Bio::CIPRES:Error qw/:constants/;
 
-    my $res = $job->download('name' => 'foobar')
-        or die "$res";
+    eval {
+        $job->download('name' => 'foobar');
+    }
+    if ($@) {
+        warn "Authentication error" if ($@ == ERR_AUTHENTICATION);
+        # or just use the default stringification
+        warn $@;
+    }
 
 =head1 DESCRIPTION
 
-C<Bio::CIPRES::Error> is a simple error class for the CIPRES API. It's purpose
+C<Bio::CIPRES::Error> is a simple error class for the CIPRES API. Its purpose
 is to parse the XML error report returned by CIPRES and provide an object that
-can be used in different contexts. In boolean contexts it always returns a
-false value, in string context it returns a textual summary of the error, and
-in numeric context it returns the error code.
+can be used in different contexts. In string context it returns a textual
+summary of the error, and in numeric context it returns the error code.
 
 This class does not contain any methods (including the constructor) intended
-to be called by the end user. It's functionality is encoded in it's overload
-behavior is described above.
+to be called by the end user. Its functionality is encoded in its overload
+behavior as described above.
+
+=head1 EXPORTS
+
+The following error codes are available under the ':constants' tag:
+
+=over 4
+
+=item * ERR_AUTHORIZATION
+
+=item * ERR_AUTHENTICATION
+
+=item * ERR_NOT_FOUND
+
+=item * ERR_FORM_VALIDATION
+
+=item * ERR_USER_MISMATCH
+
+=item * ERR_BAD_REQUEST
+
+=item * ERR_GENERIC_SVC_ERR
+
+=item * ERR_GENERIC_COMM_ERR
+
+=item * ERR_BAD_INVOCATION
+
+=item * ERR_USAGE_LIMIT
+
+=item * ERR_DISABLED_RESOURCE
+
+=back
 
 =head1 METHODS
 
 None
 
 =head1 CAVEATS AND BUGS
-
-This is code is in alpha testing stage and the API is not guaranteed to be
-stable.
 
 Please reports bugs to the author.
 

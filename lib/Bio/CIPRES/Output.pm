@@ -85,7 +85,7 @@ Bio::CIPRES::Output - a single CIPRES job output file
 
 =head1 SYNOPSIS
 
-    for my $output ($job->list_outputs) {
+    for my $output ($job->outputs) {
 
         print "filename:", $output->name, "\n";
         print "BIG FILE!!\n" if ($output->size > 1024**3);
@@ -132,7 +132,7 @@ Returns the output group that the file is a member of.
 
 =item B<download>
 
-    my $content = $output->download
+    my $content = $output->download;
     my $res = $output->download( 'out' => $filename );
 
 Attempts to download the output file, and either returns the contents (if no
