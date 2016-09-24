@@ -1,5 +1,8 @@
-Revision history for BioX-Seq
+Revision history for Bio-CIPRES
 
-0.01    2016-03-31
-        Initial release
+0.002    2016-09-23
+         Numerous POD fixes
+
+0.001    2016-09-23
+         Initial release
 
