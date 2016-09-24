@@ -311,6 +311,10 @@ Currently the use of UMBRELLA authentication is not implemented.
 
 Please report bugs to the author.
 
+=head1 SEE ALSO
+
+L<https://www.phylo.org/restusers/documentation.action>
+
 =head1 AUTHOR
 
 Jeremy Volkening <jdv@base2bio.com>
