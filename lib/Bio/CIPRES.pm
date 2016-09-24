@@ -21,13 +21,28 @@ our $SERVER  = 'cipresrest.sdsc.edu';
 our $API     = 'cipresrest/v1';
 our $DOMAIN  = 'Cipres Authentication';
 
-my %defaults = (
+my %required = (
     url     => "https://$SERVER/$API/",
     timeout => 60,
     app_id  => 'cipres_perl-E9B8D52FA2A54472BF13F25E4CD957D4',
     user    => undef,
     pass    => undef,
 );
+
+my %optional = (
+    app_name     => undef,
+    eu           => undef,
+    eu_email     => undef,
+    eu_instition => undef,
+    eu_country   => undef,
+);
+
+my @eu_headers = qw/
+    eu
+    eu_email
+    eu_institution
+    eu_country
+/;
 
 sub new {
 
@@ -43,9 +58,7 @@ sub new {
         ssl_opts => {verify_hostname => 0},
         timeout  => $self->{cfg}->{timeout},
     );
-    $self->{agent}->default_header(
-        'cipres-appkey' => $self->{cfg}->{app_id}
-    );
+
     my $netloc = join ':', $self->{uri}->host, $self->{uri}->port;
     $self->{agent}->credentials(
         $netloc,
@@ -53,6 +66,26 @@ sub new {
         $self->{cfg}->{user},
         $self->{cfg}->{pass}
     );
+
+    my %headers = ( 'cipres-appkey' => $self->{cfg}->{app_id} );
+
+    # UMBRELLA headers
+    if (defined $self->{cfg}->{eu}) {
+        croak "eu_email required for UMBRELLA authentication"
+            if (! defined $self->{cfg}->{'eu_email'});
+        croak "app_name required for UMBRELLA authentication"
+            if (! defined $self->{cfg}->{'app_name'});
+        for my $h (@eu_headers) {
+            my $val = $self->{cfg}->{$h} // next;
+            $h =~ s/_/\-/g;
+            $headers{"cipres-$h"} = $val;
+        }
+
+        $self->{cfg}->{user}
+            = uri_escape( "$self->{cfg}->{app_name}.$self->{cfg}->{eu}" );
+    }
+
+    $self->{agent}->default_header(%headers);
 
     return $self;
 
@@ -64,7 +97,7 @@ sub _parse_args {
     my ($fn_cfg) = delete $args{conf};
 
     # set defaults
-    $self->{cfg} = {%defaults}; # copy, don't reference!
+    $self->{cfg} = {%required}; # copy, don't reference!
 
     # read from config file if asked, overwriting defaults
     if (defined $fn_cfg) {
@@ -81,12 +114,13 @@ sub _parse_args {
     $self->{cfg}->{$_} = $args{$_} for (keys %args);
 
     # check that all defined fields are valid
-    my @extra = grep {! exists $defaults{$_}} keys %{ $self->{cfg} };
+    my @extra = grep {! exists $required{$_} && ! exists $optional{$_}}
+        keys %{ $self->{cfg} };
     croak "Unexpected config variables found (@extra) -- check syntax"
         if (scalar @extra);
 
     # check that all required fields are defined
-    my @missing = grep {! defined $self->{cfg}->{$_}} keys %defaults;
+    my @missing = grep {! defined $self->{cfg}->{$_}} keys %required;
     croak "Required config variables missing (@missing) -- check syntax"
         if (scalar @missing);
 
@@ -94,7 +128,7 @@ sub _parse_args {
   
     # Do necessary url-encoding
     for (qw/user pass/) {
-        $self->{cfg}->{$_} =  uri_escape( $self->{cfg}->{$_} );
+        $self->{cfg}->{$_} = uri_escape( $self->{cfg}->{$_} );
     }
    
     # add auth info to string
@@ -245,20 +279,63 @@ user (check L<SEE ALSO> for links to tool documentation).
         conf => "$ENV{HOME}/.cipres"
     );
 
-Create a new C<Bio::CIPRES> object. There are three required parameters:
-username (C<user>), passphrase (C<pass>), and application ID (C<app_id>).
-These can either be passed in on the constructor or read in from a
-configuration file, as demonstrated above. The configuration file should
-contain key=value pairs, one pair per line, as in:
+Create a new C<Bio::CIPRES> object. There are a number of required and
+optional parameters which can be specified in the constructor or read from a
+configuration file. The configuration file should contain key=value pairs, one
+pair per line, as in:
 
     user=foo
     pass=bar
-    app_id=foo_bar_baz
+    app_id=foo_bar-12345
+
+Required parameters:
+
+=over 1
+
+=item * user - the username of your registered CIPRES REST account
+
+=item * pass - the password of your registered CIPRES REST account
+
+=back
 
 The passphrase must be stored in plaintext, so the usual precautions apply
 (e.g. the file should not be world-readable). If possible, find another way to
 retrieve the passphrase within your code and pass it in directly as a method
 argument.
+
+Optional parameters:
+
+=over 1
+
+=item * app_id - override the application ID assigned to Bio::CIPRES 
+
+=item * url - override the default base REST url (don't change this unless you
+know what you're doing).
+
+=item * timeout - set the network timeout for HTTP requests
+
+=back
+
+UMBRELLA parameters:
+
+These parameters are only for use with UMBRELLA applications (you will need
+you register your own UMBRELLA application to use this functionality). They
+are not needed for non-UMBRELLA applications, but if C<eu> is defined then
+UMBRELLA is assumed and C<eu_email> and C<app_name> must be defined as well.
+
+=over 1
+
+=item * eu - end user name
+
+=item * eu_email - end user email address
+
+=item * app_name - UMBRELLA application name as registered with CIPRES
+
+=item * eu_institution - end user institution (currently optional)
+
+=item * eu_country - end user two-letter country code (currently optional)
+
+=back
 
 =item B<submit_job>
 
