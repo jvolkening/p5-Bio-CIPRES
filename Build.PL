@@ -23,7 +23,7 @@ my $builder = Module::Build->new(
         'URI'          => 0,
         'URI::Escape'  => 0,
         'XML::LibXML'  => 0,
-        'DateTime::Format::RFC3339' => 0,
+        'Time::Piece'  => 0,
     },
     meta_merge => {
         resources => {
