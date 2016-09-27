@@ -159,6 +159,7 @@ sub wait {
     while (! $self->is_finished) {
         sleep $self->poll_interval;
         $self->refresh;
+        next if ($timeout < 0);
         return 0 if (time - $start > $timeout);
     }
     return 1;

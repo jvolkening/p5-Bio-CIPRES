@@ -53,7 +53,7 @@ SKIP: {
     isa_ok( $job, 'Bio::CIPRES::Job' );
    
     # wait for completion and check final status/results
-    ok( $job->wait(600), "wait() returned true" );
+    ok( $job->wait(), "wait() returned true" );
     is( $job->stage, 'COMPLETED', "returned expected job stage" );
     cmp_ok( $job->exit_code, '==', 0, "job return expected exit status" );
 
