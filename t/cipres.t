@@ -32,7 +32,7 @@ SKIP: {
     # job submission should fail with authentication error
     eval { $ua->submit_job() };
     ok( $@, "submit_job threw exception" );
-    diag( "ERR: $@ $!\n" );
+    diag( "NET: $@ $!\n" );
     isa_ok( $@, 'Bio::CIPRES::Error' );
     cmp_ok( $@,  '==', ERR_AUTHENTICATION, "exception == ERR_AUTHENTICATION");
 

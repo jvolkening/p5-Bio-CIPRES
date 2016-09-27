@@ -16,12 +16,11 @@ use Bio::CIPRES::Job;
 use Bio::CIPRES::Error;
 
 our $VERSION = '0.003';
-our $UA      = 'Bio::CIPRES';
 our $SERVER  = 'cipresrest.sdsc.edu';
 our $API     = 'cipresrest/v1';
 our $DOMAIN  = 'Cipres Authentication';
 
-my %required = (
+my %required = ( # must be defined after config parsing
     url     => "https://$SERVER/$API/",
     timeout => 60,
     app_id  => 'cipres_perl-E9B8D52FA2A54472BF13F25E4CD957D4',
@@ -29,12 +28,12 @@ my %required = (
     pass    => undef,
 );
 
-my %optional = (
-    app_name     => undef,
-    eu           => undef,
-    eu_email     => undef,
-    eu_instition => undef,
-    eu_country   => undef,
+my %umb_only = ( # only for UMBRELLA auth
+    eu           => undef, # if this is defined, then the rest are:
+    eu_email     => undef, # REQUIRED
+    app_name     => undef, # REQUIRED
+    eu_instition => undef, # optional
+    eu_country   => undef, # optional
 );
 
 my @eu_headers = qw/
@@ -54,7 +53,7 @@ sub new {
 
     # setup user agent
     $self->{agent} = LWP::UserAgent->new(
-        agent    => "$UA/$VERSION",
+        agent    => __PACKAGE__ . "/$VERSION",
         ssl_opts => {verify_hostname => 0},
         timeout  => $self->{cfg}->{timeout},
     );
@@ -69,6 +68,8 @@ sub new {
 
     my %headers = ( 'cipres-appkey' => $self->{cfg}->{app_id} );
 
+    $self->{account} = $self->{cfg}->{user};
+
     # UMBRELLA headers
     if (defined $self->{cfg}->{eu}) {
         croak "eu_email required for UMBRELLA authentication"
@@ -81,7 +82,7 @@ sub new {
             $headers{"cipres-$h"} = $val;
         }
 
-        $self->{cfg}->{user}
+        $self->{account}
             = uri_escape( "$self->{cfg}->{app_name}.$self->{cfg}->{eu}" );
     }
 
@@ -114,7 +115,7 @@ sub _parse_args {
     $self->{cfg}->{$_} = $args{$_} for (keys %args);
 
     # check that all defined fields are valid
-    my @extra = grep {! exists $required{$_} && ! exists $optional{$_}}
+    my @extra = grep {! exists $required{$_} && ! exists $umb_only{$_}}
         keys %{ $self->{cfg} };
     croak "Unexpected config variables found (@extra) -- check syntax"
         if (scalar @extra);
@@ -131,8 +132,10 @@ sub _parse_args {
         $self->{cfg}->{$_} = uri_escape( $self->{cfg}->{$_} );
     }
    
-    # add auth info to string
+    # create URI object for easier protocol/port parsing
     $self->{uri} = URI->new( $self->{cfg}->{url} );
+
+    return 1;
 
 }
 
@@ -143,8 +146,8 @@ sub list_jobs {
     my $res = $self->_get(
         "$self->{uri}/job/$self->{cfg}->{user}?expand=true"
     );
-
     my $dom = XML::LibXML->load_xml('string' => $res);
+
     return map {
         Bio::CIPRES::Job->new( agent => $self->{agent}, dom => $_ )
     } $dom->findnodes('/joblist/jobs/jobstatus');
@@ -154,11 +157,12 @@ sub list_jobs {
 sub get_job {
 
     my ($self, $handle) = @_;
+
     my $res = $self->_get(
         "$self->{uri}/job/$self->{cfg}->{user}/$handle"
     );
-
     my $dom = XML::LibXML->load_xml('string' => $res);
+
     return Bio::CIPRES::Job->new(
         agent => $self->{agent},
         dom   => $dom,
@@ -174,8 +178,8 @@ sub submit_job {
         "$self->{uri}/job/$self->{cfg}->{user}",
         @args,
     );
-
     my $dom = XML::LibXML->load_xml('string' => $res);
+
     return Bio::CIPRES::Job->new(
         agent => $self->{agent},
         dom   => $dom,
@@ -288,7 +292,7 @@ pair per line, as in:
     pass=bar
     app_id=foo_bar-12345
 
-Required parameters:
+Required parameters (no defaults):
 
 =over 1
 
@@ -303,7 +307,7 @@ The passphrase must be stored in plaintext, so the usual precautions apply
 retrieve the passphrase within your code and pass it in directly as a method
 argument.
 
-Optional parameters:
+Optional parameters (must be defined but defaults are provided):
 
 =over 1
 
@@ -378,6 +382,14 @@ L<Bio::CIPRES::Job> object representing the appropriate job, or undef if not
 found.
 
 =back
+
+=head1 TESTING
+
+The distribution can be installed and tested in the usual ways. Note however,
+that running the full test suite requires CIPRES REST credentials (not shipped
+with package for obvious reasons). If a credentials file is found at
+"$ENV{HOME}/.cipres", the full test suite will be run -- otherwise only
+rudimentary tests will be run and most will be skipped.
 
 =head1 CAVEATS AND BUGS
 
