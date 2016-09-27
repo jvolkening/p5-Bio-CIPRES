@@ -1,125 +1,186 @@
-=head1 NAME
+NAME
+    Bio::CIPRES - interface to the CIPRES REST API
 
-Bio::CIPRES - interface to the CIPRES REST API
+SYNOPSIS
+        use Bio::CIPRES;
 
-=head1 SYNOPSIS
+        my $ua = Bio::CIPRES->new(
+            user    => $username,
+            pass    => $password,
+            app_id  => $id,
+            timeout => 60,
+        );
 
-    use Bio::CIPRES;
+        my $job = $ua->submit_job( %job_params );
 
-    my $ua = Bio::CIPRES->new(
-        user    => $username,
-        pass    => $password,
-        app_id  => $id,
-        timeout => 60,
-    );
-
-    my $job = $ua->submit_job( %job_params );
-
-    while (! $job->is_finished) {
-        sleep $job->poll_interval;
-        $job->refresh_status;
-    }
-
-    if ($job->exit_code == 0) {
+        while (! $job->is_finished) {
+            sleep $job->poll_interval;
+            $job->refresh;
+        }
 
         print STDOUT $job->stdout;
         print STDERR $job->stderr;
-        for my $file ($job->list_outputs) {
-            $file->download( $file->name );
+
+        if ($job->exit_code == 0) {
+
+            for my $file ($job->outputs) {
+                $file->download( out => $file->name );
+            }
+
         }
 
-    }
-    
+DESCRIPTION
+    "Bio::CIPRES" is an interface to the CIPRES REST API for running
+    phylogenetic analyses. Currently it provides general classes and methods
+    for job submission and handling - determination of the correct
+    parameters to submit is up to the user (check "SEE ALSO" for links to
+    tool documentation).
 
-=head1 DESCRIPTION
+METHODS
+    new
+            my $ua = Bio::CIPRES->new(
+                user    => $username,
+                pass    => $password,
+                app_id  => $id,
+                timeout => 60,
+            );
 
-C<Bio::CIPRES> is an interface to the CIPRES REST API for running phylogenetic
-analyses. Currently it provides general classes and methods for job submission
-and handling - determination of the correct parameters to submit is up to the
-user (check L<SEE ALSO> for links to tool documentation).
+            # or read configuration from file
 
-=head1 METHODS
+            my $ua = Bio::CIPRES->new(
+                conf => "$ENV{HOME}/.cipres"
+            );
 
-=over 4
+        Create a new "Bio::CIPRES" object. There are a number of required
+        and optional parameters which can be specified in the constructor or
+        read from a configuration file. The configuration file should
+        contain key=value pairs, one pair per line, as in:
 
-=item B<new>
+            user=foo
+            pass=bar
+            app_id=foo_bar-12345
 
-    my $ua = Bio::CIPRES->new(
-        user    => $username,
-        pass    => $password,
-        app_id  => $id,
-        timeout => 60,
-    );
+        Required parameters (no defaults):
 
-    # or read configuration from file
+        *
+         user - the username of your registered CIPRES REST account
 
-    my $ua = Bio::CIPRES->new(
-        conf => "$ENV{HOME}/.cipres"
-    );
+        *
+         pass - the password of your registered CIPRES REST account
 
-Create a new C<Bio::CIPRES> object. There are three required parameters:
-username (C<user>), passphrase (C<pass>), and application ID (C<app_id>).
-These can either be passed in on the constructor or read in from a
-configuration file, as demonstrated above. The configuration file should
-contain key=value pairs, one pair per line, as in:
+        The passphrase must be stored in plaintext, so the usual precautions
+        apply (e.g. the file should not be world-readable). If possible,
+        find another way to retrieve the passphrase within your code and
+        pass it in directly as a method argument.
 
-    user=foo
-    pass=bar
-    app_id=foo_bar_baz
+        Optional parameters (must be defined but defaults are provided):
 
-The passphrase must be stored in plaintext, so the usual precautions apply
-(e.g. the file should not be world-readable). If possible, find another way to
-retrieve the passphrase within your code and pass it in directly as a method
-argument.
+        *
+         app_id - override the application ID assigned to Bio::CIPRES
 
-=item B<submit_job>
+        *
+         url - override the default base REST url (don't change this unless
+         you know what you're doing).
 
-    my $job = $ua->submit_job( %params );
+        *
+         timeout - set the network timeout for HTTP requests
 
-Submit a new job to the CIPRES service. Params are set based on the tool
-documentation (not covered here). Returns a L<Bio::CIPRES::Job> object.
+        UMBRELLA parameters:
 
-=item B<list_jobs>
+        These parameters are only for use with UMBRELLA applications (you
+        will need you register your own UMBRELLA application to use this
+        functionality). They are not needed for non-UMBRELLA applications,
+        but if "eu" is defined then UMBRELLA is assumed and "eu_email" and
+        "app_name" must be defined as well.
 
-    for my $job ( $ua->list_jobs ) {
-        # do something
-    }
+        *
+         eu - end user name
 
-Returns an array of L<Bio::CIPRES::Job> objects representing jobs in the
-user's workspace.
+        *
+         eu_email - end user email address
 
-=item B<get_job_by_handle>
+        *
+         app_name - UMBRELLA application name as registered with CIPRES
 
-    my $job = $ua->get_job_by_handle( $job_handle );
+        *
+         eu_institution - end user institution (currently optional)
 
-Takes a single argument (string containing the job handle/ID) and returns a
-L<Bio::CIPRES::Job> object representing the appropriate job, or undef if not
-found.
+        *
+         eu_country - end user two-letter country code (currently optional)
 
-=back
+    submit_job
+            my $job = $ua->submit_job( %params );
 
-=head1 CAVEATS AND BUGS
+        Submit a new job to the CIPRES service. Params are set based on the
+        tool documentation (not covered here). Returns a Bio::CIPRES::Job
+        object.
 
-Please report bugs to the author.
+        Most params are passed as simple key => value pairs of strings based
+        on the CIPRES tool documentation. One important nuance, however, is
+        in the handling of input files. If the contents of a input file are
+        to be passed in as a scalar, they should be provided directly as the
+        scalar value to the appropriate key:
 
-=head1 AUTHOR
+            my $job = $ua->submit_job( 'input.infile_' => $in_contents );
 
-Jeremy Volkening <jdv@base2bio.com>
+        However, if the input file is to be uploaded by filename, it should
+        be passed as an array reference:
 
-=head1 COPYRIGHT AND LICENSE
+            my $job = $ua->submit_job( 'input.infile_' => [$in_filename] );
 
-Copyright 2016 Jeremy Volkening
+        Failure to understand the difference will result in errors either
+        during job submission or during the job run.
 
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later
-version.
+    list_jobs
+            for my $job ( $ua->list_jobs ) {
+                # do something
+            }
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-details.
+        Returns an array of Bio::CIPRES::Job objects representing jobs in
+        the user's workspace.
 
-You should have received a copy of the GNU General Public License along with
-this program.  If not, see <http://www.gnu.org/licenses/>.
+    get_job
+            my $job = $ua->get_job( $job_handle );
+
+        Takes a single argument (string containing the job handle/ID) and
+        returns a Bio::CIPRES::Job object representing the appropriate job,
+        or undef if not found.
+
+TESTING
+    The distribution can be installed and tested in the usual ways. Note
+    however, that running the full test suite requires CIPRES REST
+    credentials (not shipped with package for obvious reasons). If a
+    credentials file is found at "$ENV{HOME}/.cipres", the full test suite
+    will be run -- otherwise only rudimentary tests will be run and most
+    will be skipped.
+
+CAVEATS AND BUGS
+    This is code is in alpha testing stage and the API is not guaranteed to
+    be stable.
+
+    Currently the use of UMBRELLA authentication is not implemented.
+
+    Please report bugs to the author.
+
+SEE ALSO
+    <https://www.phylo.org/restusers/documentation.action>
+
+AUTHOR
+    Jeremy Volkening <jdv@base2bio.com>
+
+COPYRIGHT AND LICENSE
+    Copyright 2016 Jeremy Volkening
+
+    This program is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    This program is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+    Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program. If not, see <http://www.gnu.org/licenses/>.
 

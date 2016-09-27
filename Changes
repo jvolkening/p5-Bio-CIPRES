@@ -1,5 +1,9 @@
 Revision history for Bio-CIPRES
 
+0.003    2016-09-27
+         Added UMBRELLA auth support
+         Minor bugfixes to test suite
+
 0.002    2016-09-23
          Numerous POD fixes
 
