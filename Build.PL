@@ -20,6 +20,7 @@ my $builder = Module::Build->new(
         'List::Util'   => 0,
         'Scalar::Util' => 0,
         'LWP'          => 0,
+        'LWP::Protocol::https' => 0,
         'URI'          => 0,
         'URI::Escape'  => 0,
         'XML::LibXML'  => 0,
