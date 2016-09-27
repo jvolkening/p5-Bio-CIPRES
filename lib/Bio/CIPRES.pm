@@ -57,6 +57,9 @@ sub new {
         ssl_opts => {verify_hostname => 0},
         timeout  => $self->{cfg}->{timeout},
     );
+   
+    # create URI object for easier protocol/port parsing
+    $self->{uri} = URI->new( $self->{cfg}->{url} );
 
     my $netloc = join ':', $self->{uri}->host, $self->{uri}->port;
     $self->{agent}->credentials(
@@ -86,6 +89,7 @@ sub new {
             = uri_escape( "$self->{cfg}->{app_name}.$self->{cfg}->{eu}" );
     }
 
+    $self->{uri}->path("/$API/job/$self->{account}");
     $self->{agent}->default_header(%headers);
 
     return $self;
@@ -131,9 +135,6 @@ sub _parse_args {
     for (qw/user pass/) {
         $self->{cfg}->{$_} = uri_escape( $self->{cfg}->{$_} );
     }
-   
-    # create URI object for easier protocol/port parsing
-    $self->{uri} = URI->new( $self->{cfg}->{url} );
 
     return 1;
 
@@ -143,9 +144,7 @@ sub list_jobs {
 
     my ($self) = @_;
 
-    my $res = $self->_get(
-        "$self->{uri}/job/$self->{cfg}->{user}?expand=true"
-    );
+    my $res = $self->_get( "$self->{uri}?expand=true" );
     my $dom = XML::LibXML->load_xml('string' => $res);
 
     return map {
@@ -158,9 +157,7 @@ sub get_job {
 
     my ($self, $handle) = @_;
 
-    my $res = $self->_get(
-        "$self->{uri}/job/$self->{cfg}->{user}/$handle"
-    );
+    my $res = $self->_get( "$self->{uri}/$handle" );
     my $dom = XML::LibXML->load_xml('string' => $res);
 
     return Bio::CIPRES::Job->new(
@@ -174,10 +171,7 @@ sub submit_job {
 
     my ($self, @args) = @_;
 
-    my $res = $self->_post(
-        "$self->{uri}/job/$self->{cfg}->{user}",
-        @args,
-    );
+    my $res = $self->_post( $self->{uri}, @args );
     my $dom = XML::LibXML->load_xml('string' => $res);
 
     return Bio::CIPRES::Job->new(
