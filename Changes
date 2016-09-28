@@ -1,5 +1,8 @@
 Revision history for Bio-CIPRES
 
+0.003002 2016-09-27
+         Fixed bug caused by typo in UMBRELLA property
+
 0.003001 2016-09-27
          Fixed fatal bug in Bio::CIPRES::Job::wait() default handling
 
