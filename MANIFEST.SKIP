@@ -82,3 +82,5 @@
 
 ^demo
 ^.travis.yml
+^.gitattributes
+^.gitignore

@@ -15,7 +15,7 @@ use XML::LibXML;
 use Bio::CIPRES::Job;
 use Bio::CIPRES::Error;
 
-our $VERSION = '0.003001';
+our $VERSION = '0.003002';
 our $SERVER  = 'cipresrest.sdsc.edu';
 our $API     = 'cipresrest/v1';
 our $DOMAIN  = 'Cipres Authentication';
@@ -29,11 +29,11 @@ my %required = ( # must be defined after config parsing
 );
 
 my %umb_only = ( # only for UMBRELLA auth
-    eu           => undef, # if this is defined, then the rest are:
-    eu_email     => undef, # REQUIRED
-    app_name     => undef, # REQUIRED
-    eu_instition => undef, # optional
-    eu_country   => undef, # optional
+    eu             => undef, # if this is defined, then the rest are:
+    eu_email       => undef, # REQUIRED
+    app_name       => undef, # REQUIRED
+    eu_institution => undef, # optional
+    eu_country     => undef, # optional
 );
 
 my @eu_headers = qw/
