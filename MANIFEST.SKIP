@@ -84,3 +84,4 @@
 ^.travis.yml
 ^.gitattributes
 ^.gitignore
+^.uncoverable

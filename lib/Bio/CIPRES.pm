@@ -92,6 +92,9 @@ sub new {
     $self->{uri}->path("/$API/job/$self->{account}");
     $self->{agent}->default_header(%headers);
 
+    croak "Failed CIPRES API connection test\n"
+        if (! $self->_check_connection);
+
     return $self;
 
 }
@@ -142,6 +145,8 @@ sub _parse_args {
 
 sub list_jobs {
 
+    # skip coverage testing as sub cannot be used anonymouselyA
+    # uncoverable subroutine
     my ($self) = @_;
 
     my $res = $self->_get( "$self->{uri}?expand=true" );
@@ -155,6 +160,8 @@ sub list_jobs {
 
 sub get_job {
 
+    # skip coverage testing as sub cannot be used anonymouselyA
+    # uncoverable subroutine
     my ($self, $handle) = @_;
 
     my $res = $self->_get( "$self->{uri}/$handle" );
@@ -169,6 +176,8 @@ sub get_job {
 
 sub submit_job {
 
+    # skip coverage testing as sub cannot be used anonymouselyA
+    # uncoverable subroutine
     my ($self, @args) = @_;
 
     my $res = $self->_post( $self->{uri}, @args );
@@ -209,6 +218,23 @@ sub _post {
         if (! $res->is_success);
 
     return $res->content;
+
+}
+
+sub _check_connection {
+
+    # do a basic check of the API, fetching the link page
+
+    my ($self) = @_;
+
+    my $uri = $self->{uri}->clone();
+    $uri->path($API);
+    my $res = $self->_get( "$uri" );
+    my $dom = XML::LibXML->load_xml('string' => $res);
+
+    $dom = $dom->firstChild;
+    return( $dom->nodeName eq 'links' );
+
 
 }
 

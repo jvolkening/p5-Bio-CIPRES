@@ -11,32 +11,49 @@ use LWP::Simple;
 use Bio::CIPRES;
 use Bio::CIPRES::Error qw/:constants/;
 
-# Bogus credentials
-my $ua = Bio::CIPRES->new(
-    user   => 'foo',
-    pass   => 'bar',
-    app_id => 'baz',
-);
-
-isa_ok( $ua, 'Bio::CIPRES' );
+# The first SKIP block contains limited tests which can be run without valid
+# credentials. Mostly this checks that the server connection can be initiated
+# and that the expected Error objects are returned on failure;
 
 SKIP: {
    
     my $p = Net::Ping->new();
 
     # Check for necessary network connections and skip otherwise
-    skip "CIPRES server not reachable", 3 if (! $p->ping($Bio::CIPRES::SERVER));
-    skip "CIPRES httpd not reachable", 3
+    skip "CIPRES server not reachable", 7 if (! $p->ping($Bio::CIPRES::SERVER));
+    skip "CIPRES httpd not reachable", 7
         if (! is_success(getprint("https://$Bio::CIPRES::SERVER")));
+
+    # direct config with bogus credentials
+    my $ua = Bio::CIPRES->new(
+        user   => 'foo',
+        pass   => 'bar',
+        app_id => 'baz',
+    );
+
+    isa_ok( $ua, 'Bio::CIPRES' );
+    ok( $ua->{cfg}->{user} eq 'foo' );
+
+    # config from file with bogus credentials
+    $ua = Bio::CIPRES->new(
+        conf => 't/test_data/cipres.conf',
+    );
+
+    isa_ok( $ua, 'Bio::CIPRES' );
+    ok( $ua->{cfg}->{user} eq 'bar' );
 
     # job submission should fail with authentication error
     eval { $ua->submit_job() };
     ok( $@, "submit_job threw exception" );
-    diag( "NET: $@ $!\n" );
+    #diag( "NET: $@ $!\n" );
     isa_ok( $@, 'Bio::CIPRES::Error' );
     cmp_ok( $@,  '==', ERR_AUTHENTICATION, "exception == ERR_AUTHENTICATION");
 
 }
+
+# The second SKIP block contains more substantial tests that will run in a
+# real config file is found. These will usually only be run on the developer's
+# system.
 
 SKIP: {
 
@@ -44,7 +61,7 @@ SKIP: {
     skip "No valid credentials available", 8 if (! -r "$ENV{HOME}/.cipres");
 
     # Good (testing) credentials
-    $ua = Bio::CIPRES->new(
+    my $ua = Bio::CIPRES->new(
         conf => "$ENV{HOME}/.cipres",
     );
 
