@@ -25,8 +25,8 @@ SKIP: {
     my $p = Net::Ping->new();
 
     # Check for necessary network connections and skip otherwise
-    skip "CIPRES server not reachable" if (! $p->ping($Bio::CIPRES::SERVER));
-    skip "CIPRES httpd not reachable"
+    skip "CIPRES server not reachable", 3 if (! $p->ping($Bio::CIPRES::SERVER));
+    skip "CIPRES httpd not reachable", 3
         if (! is_success(getprint("https://$Bio::CIPRES::SERVER")));
 
     # job submission should fail with authentication error
@@ -36,8 +36,12 @@ SKIP: {
     isa_ok( $@, 'Bio::CIPRES::Error' );
     cmp_ok( $@,  '==', ERR_AUTHENTICATION, "exception == ERR_AUTHENTICATION");
 
+}
+
+SKIP: {
+
     # Skip the rest if no user credentials found
-    skip "No valid credentials available" if (! -r "$ENV{HOME}/.cipres");
+    skip "No valid credentials available", 8 if (! -r "$ENV{HOME}/.cipres");
 
     # Good (testing) credentials
     $ua = Bio::CIPRES->new(
