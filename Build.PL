@@ -31,7 +31,10 @@ my $builder = Module::Build->new(
             repository => 'https://github.com/jvolkening/p5-Bio-CIPRES'
         }
     },
-    add_to_cleanup => [ 'Bio-CIPRES-*' ],
+    add_to_cleanup => [
+        'Bio-CIPRES-*',
+        'cover_db',
+    ],
     create_license => 1,
 );
 $builder->create_build_script;

@@ -2,7 +2,6 @@
 !/.gitignore
 !/.gitattributes
 !/.travis.yml
-!/.uncoverable
 /Makefile
 /Makefile.old
 /blib/

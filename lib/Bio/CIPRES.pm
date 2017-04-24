@@ -15,7 +15,7 @@ use XML::LibXML;
 use Bio::CIPRES::Job;
 use Bio::CIPRES::Error;
 
-our $VERSION = '0.003002';
+our $VERSION = '0.003003';
 our $SERVER  = 'cipresrest.sdsc.edu';
 our $API     = 'cipresrest/v1';
 our $DOMAIN  = 'Cipres Authentication';
@@ -145,8 +145,6 @@ sub _parse_args {
 
 sub list_jobs {
 
-    # skip coverage testing as sub cannot be used anonymouselyA
-    # uncoverable subroutine
     my ($self) = @_;
 
     my $res = $self->_get( "$self->{uri}?expand=true" );
@@ -160,8 +158,6 @@ sub list_jobs {
 
 sub get_job {
 
-    # skip coverage testing as sub cannot be used anonymouselyA
-    # uncoverable subroutine
     my ($self, $handle) = @_;
 
     my $res = $self->_get( "$self->{uri}/$handle" );
@@ -176,8 +172,6 @@ sub get_job {
 
 sub submit_job {
 
-    # skip coverage testing as sub cannot be used anonymouselyA
-    # uncoverable subroutine
     my ($self, @args) = @_;
 
     my $res = $self->_post( $self->{uri}, @args );

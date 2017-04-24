@@ -128,7 +128,8 @@ sub exit_code {
     if ($content =~ /^retval=(\d+)$/m) {
         return $1;
     }
-    
+  
+    # uncoverable statement
     return undef;
        
 }
@@ -196,12 +197,21 @@ sub _parse_status {
     $s->{url_working} = $dom->findvalue('workingDirUri/url');
     $s->{poll_secs}   = $dom->findvalue('minPollIntervalSeconds');
     $s->{is_finished} = $dom->findvalue('terminalStage') =~ /^true$/i ? 1 : 0;
-    $s->{is_failed}   = $dom->findvalue('failed');
+    $s->{is_failed}   = $dom->findvalue('failed') =~ /^true$/i ? 1 : 0;;
     $s->{stage}       = $dom->findvalue('jobStage');
     $s->{submit_time} = $dom->findvalue('dateSubmitted');
 
     # check for missing values
     map {length $s->{$_} || croak "Missing value for $_\n"} keys %$s;
+
+    # parse submit time
+    my $submit_time = $s->{submit_time};
+    $submit_time =~ s/(\d\d):(\d\d)$/$1$2/;
+    $submit_time = Time::Piece->strptime(
+        $submit_time,
+        "%Y-%m-%dT%H:%M:%S%z",
+    ) or croak "Failed to parse submit time ($s->{submit_time})\n";
+    $s->{submit_time} = $submit_time;
 
     # parse messages
     for my $msg ($dom->findnodes('messages/message')) {
