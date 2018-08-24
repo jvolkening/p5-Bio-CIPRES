@@ -424,7 +424,7 @@ Jeremy Volkening <jdv@base2bio.com>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2016 Jeremy Volkening
+Copyright 2016-2018 Jeremy Volkening
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
