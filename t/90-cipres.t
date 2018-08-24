@@ -113,9 +113,12 @@ SKIP: {
 
     my ($result) = $job->outputs(name => 'infile.aln', group => 'aligfile');
     isa_ok( $result, 'Bio::CIPRES::Output' );
-    cmp_ok( $result->size, '==', 119, "output correct size" );
+    cmp_ok( $result->size, '==', 114, "output correct size" );
 
     my $contents = $result->download;
+    open my $foo, '>', 'foobarbaz';
+    print {$foo} $contents;
+    close $foo;
     like( $contents, qr/^test_seq_2\s+AAAT/mi, "returned expected job output" );
 
     my $stdout = $job->stdout;
