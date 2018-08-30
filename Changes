@@ -1,5 +1,8 @@
 Revision history for Bio-CIPRES
 
+0.004    2018-08-30
+         Added Bio::CIPRES::Message class for better message handling
+         Check downloads against advertised size
 0.003004 2018-08-24
          Fixed test to account for small change in output format
          Renamed tests to adjust order
