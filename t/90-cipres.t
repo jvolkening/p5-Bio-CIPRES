@@ -58,12 +58,20 @@ SKIP: {
 SKIP: {
 
     # Skip the rest if no user credentials found
-    skip "No valid credentials available", 21 if (! -r "$ENV{HOME}/.cipres");
+    skip "No valid credentials available", 21
+        if ( ! -r "$ENV{HOME}/.cipres"
+        && (! defined $ENV{CIPRES_USER} || ! defined $ENV{CIPRES_PASS}) );
 
     # Good (testing) credentials
-    my $ua = Bio::CIPRES->new(
-        conf => "$ENV{HOME}/.cipres",
-    );
+    my $ua = -r "$ENV{HOME}/.cipres"
+      ? Bio::CIPRES->new(
+            conf => "$ENV{HOME}/.cipres",
+        )
+      : Bio::CIPRES->new(
+            user => $ENV{CIPRES_USER},
+            pass => $ENV{CIPRES_PASS},
+        );
+    isa_ok( $ua, 'Bio::CIPRES' );
 
     # try to fetch non-existant job
     eval { $ua->get_job('foobar') };
@@ -111,9 +119,17 @@ SKIP: {
 
     ok(! $job->is_failed, "job not failed" );
 
+    # test Bio::CIPRES::Message
+    my $msg = $job->messages()->[-1];
+    is( $msg->stage, 'COMPLETED' , "message returned expected state" );
+    ok( length $msg->text, "message returned a text summary" );
+    isa_ok( $msg->timestamp, 'Time::Piece' );
+    ok( "$msg" =~ /^Output/, "message stringification works" );
+
     my ($result) = $job->outputs(name => 'infile.aln', group => 'aligfile');
     isa_ok( $result, 'Bio::CIPRES::Output' );
     cmp_ok( $result->size, '==', 114, "output correct size" );
+    ok( $result->url =~ /^http/, "output has download URL" );
 
     my $contents = $result->download;
     open my $foo, '>', 'foobarbaz';
