@@ -62,6 +62,12 @@ SKIP: {
         if ( ! -r "$ENV{HOME}/.cipres"
         && (! defined $ENV{CIPRES_USER} || ! defined $ENV{CIPRES_PASS}) );
 
+    # additional tests for Bio::CIPRES::Error
+    eval { Bio::CIPRES::Error->new() };
+    ok($@ =~ /Undefined XML string in constructor/, "new Error missing XML" );
+    eval { Bio::CIPRES::Error->new('foo') };
+    ok($@ =~ /Start tag expected/, "new Error invalid XML" );
+
     # Good (testing) credentials
     my $ua = -r "$ENV{HOME}/.cipres"
       ? Bio::CIPRES->new(
@@ -92,6 +98,7 @@ SKIP: {
     ok( $@, "submit_job() threw expected exception" );
     isa_ok( $@, 'Bio::CIPRES::Error' );
     cmp_ok( $@,  '==', ERR_FORM_VALIDATION, "exception == ERR_FORM_VALIDATION");
+    ok( "$@" =~ /Error in param/, "exception stringification worked");
 
     # submit good job
     my $job = $ua->submit_job(
@@ -131,11 +138,18 @@ SKIP: {
     cmp_ok( $result->size, '==', 114, "output correct size" );
     ok( $result->url =~ /^http/, "output has download URL" );
 
+    # test output download to scalar
     my $contents = $result->download;
-    open my $foo, '>', 'foobarbaz';
-    print {$foo} $contents;
-    close $foo;
     like( $contents, qr/^test_seq_2\s+AAAT/mi, "returned expected job output" );
+
+    # test handling of output paths
+    eval {my $res = $result->download(out => '/this/path/should/not/exist') };
+    ok( $@ =~ /^Unspecified error/, "Error on non-writable path" );
+    open my $touch, '>', 'foo';
+    eval {$result->download(out => 'foo') };
+    ok( $@ =~ /^Output file exists/, "Error on existing file" );
+    ok( $result->download(out => 'foo', overwrite => 1), "Overwrite");
+    unlink 'foo';
 
     my $stdout = $job->stdout;
     my $stderr = $job->stderr;

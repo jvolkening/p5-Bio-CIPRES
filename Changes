@@ -1,5 +1,9 @@
 Revision history for Bio-CIPRES
 
+0.004001 2018-09-01
+         Improved checks and safeguards on file downloads
+         Expanded test coverage
+
 0.004    2018-08-31
          Added Bio::CIPRES::Message class for better message handling
          Check downloads against advertised size
