@@ -1,5 +1,8 @@
 Revision history for Bio-CIPRES
 
+0.004003 2018-09-12
+         Remove inadvertent debug msg in STDOUT
+
 0.004002 2018-09-10
          Fix credential encoding bug
 

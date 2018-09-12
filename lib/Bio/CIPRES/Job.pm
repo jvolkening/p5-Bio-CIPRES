@@ -85,9 +85,6 @@ sub refresh {
     my ($self) = @_;
 
     my $xml = $self->_get( $self->{url_status} );
-    say "\n", '=' . 80, "\n";
-    say $xml;
-    say "\n", '=' . 80, "\n";
     my $dom = XML::LibXML->load_xml( string => $xml );
     $self->_parse_status($dom);
 
