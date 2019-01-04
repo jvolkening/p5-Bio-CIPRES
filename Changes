@@ -1,5 +1,8 @@
 Revision history for Bio-CIPRES
 
+0.004004 2019-01-03
+         Add 'run_cipres' tool
+
 0.004003 2018-09-12
          Remove inadvertent debug msg in STDOUT
 

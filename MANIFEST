@@ -1,3 +1,4 @@
+bin/run_cipres
 Build.PL
 Changes
 lib/Bio/CIPRES.pm

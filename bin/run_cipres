@@ -1,0 +1,215 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use 5.012;
+use autodie;
+
+use Bio::CIPRES;
+use File::Path qw/make_path/;
+use Getopt::Long;
+use List::Util qw/max/;
+use Pod::Usage;
+
+# allow arbitrary option names
+Getopt::Long::Configure("pass_through");
+
+my $tool_id;
+my $dir_out;
+my $runtime = 0.5; # in hours
+my $verbose = 0;
+my %inputs;
+my %params;
+
+GetOptions(
+    'tool_id=s' => \$tool_id,
+    'dir_out=s' => \$dir_out,
+    'runtime=f' => \$runtime,
+    'input=s'   => \%inputs,
+    'param=s'   => \%params,
+    'verbose'   => \$verbose,
+    'man'       => sub{ pod2usage(-verbose => 2); },
+    'help'      => sub{ pod2usage(-verbose => 2); },
+);
+
+# check for required arguments
+die "Must specify tool ID (--tool_id)\n"
+    if (! defined $tool_id);
+die "Must specify output directory (--dir_out)\n"
+    if (! defined $dir_out);
+
+die "Must specify at least one input file\n"
+    if (scalar keys %inputs < 1);
+
+my $r = sprintf("${tool_id}_%05d", rand(100000));
+
+# build parameter list to submit to CIPRES
+my %job_params = (
+    'tool'                    => $tool_id,
+    'vparam.runtime_'         => $runtime,
+    'metadata.clientJobId'    => $r,
+    'metadata.clientJobName'  => "job $r",
+    'metadata.clientToolName' => "TEST $tool_id",
+    'metadata.statusEmail'    => 'false',
+);
+for my $key (keys %inputs) {
+    my $k = "input.${key}_"; # must have a trailing underscore added
+    my $v = [$inputs{$key}]; # must be an array reference 
+    $job_params{$k} = $v;
+}
+for my $key (keys %params) {
+    my $k = "vparam.${key}_"; # must have a trailing underscore added
+    my $v = $params{$key};    # must be a simple scalar
+    $job_params{$k} = $v;
+}
+
+if ($verbose) {
+    say "The following parameters will be sent:";
+    my $width = max map {length $_} keys %job_params;
+    while (my ($k,$v) = each(%job_params) ) {
+        $v = $v->[0] if (ref $v); # deference filenames for printing
+        say sprintf "%${width}s : %s", $k, $v;
+    }
+}
+
+my $ua = Bio::CIPRES->new(
+    conf => "$ENV{HOME}/.cipres",
+);
+
+say "Submitting job...";
+my $job = $ua->submit_job(%job_params);
+
+say 'Initial status:', $job->stage;
+say 'Waiting for job completion (this may take a while)...';
+
+$job->wait($runtime*60*60)
+    or die "Timeout waiting for job";
+
+my $exit_code = $job->exit_code;
+
+if (! -e $dir_out) {
+    make_path( $dir_out );
+}
+
+# success
+if (! defined $exit_code || $exit_code == 0) {
+
+    say "OUTPUTS:" if ($verbose);
+   
+    for my $file ( $job->outputs() ) {
+        my $out = "$dir_out/" . $file->name;
+        say "\t", $file->name
+            if ($verbose);
+        $file->download(out => $out);
+    }
+
+    print "\n" if ($verbose);
+    say 'Completed successfully.';
+
+}
+# failure
+else {
+    say "ERROR: returned $exit_code";
+    print "\n";
+    say "STDOUT DUMP:\n", $job->stdout;
+    print "\n";
+    say "STDERR DUMP:\n", $job->stderr;
+}
+
+$job->delete;
+
+exit;
+
+
+__END__
+
+=head1 NAME
+
+run_cipres - run a CIPRES tool via the REST API and fetch all outputs
+
+=head1 SYNOPSIS
+
+run_cipres --tool_id SOME_TOOL --dir_out /path/to/outputs --input key=file --param key=value [...]
+
+=head1 DESCRIPTION
+
+This tool takes a tool ID and set of input files, submits a job to CIPRES, and
+fetches the results upon completion. The command line syntax is described
+further below.
+
+=head1 PREREQUISITES
+
+Requires the following non-core Perl libraries to be installed:
+
+=over 1
+
+=item Bio::CIPRES
+
+=back
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--tool_id> I<string>
+
+(Required) The tool ID as expected by CIPRES (e.g. 'BWA_XSEDE')
+
+=item B<--dir_out> I<path>
+
+(Required) The directory to which output files are written. Will be created if
+it doesn't already exist.
+
+=item B<--runtime> I<path>
+
+The time (in hours) requested for the run. Setting this too low will result in
+the job timing out before completion. Setting it too high may increase the
+time that the job waits in the queue to be run. If in doubt, err on the long
+size. Default: 0.5
+
+=item B<--input> I<key=filename>
+
+Specifies an input file to be submitted with the job. The value of this option
+is itself a key/value pair separated by a '='. The first part must correspond
+exactly to an input ID as expected by CIPRES. To find this you will probably
+need to read through the PISE XML file. The second part is the path to the
+file on disk. This option may (and often will) be specified multiple times,
+but the key must be unique each time or it will be silently overwritten.
+
+=item B<--param> I<key=value>
+
+Specifies an extra parameter to be submitted with the job. The value of this option
+is itself a key/value pair separated by a '='. The first part must correspond
+exactly to a parameter ID as expected by CIPRES. To find this you will probably
+need to read through the PISE XML file. The second part is the value of the
+parameter to be sent. This option may (and often will) be specified multiple times,
+but the key must be unique each time or it will be silently overwritten.
+
+=back
+
+=head1 CAVEATS AND BUGS
+
+Please submit bug reports to the issue tracker in the distribution repository.
+
+=head1 AUTHOR
+
+Jeremy Volkening (jdv@base2bio.com)
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright 2014-19 Jeremy Volkening
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+=cut
