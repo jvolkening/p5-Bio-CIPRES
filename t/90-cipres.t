@@ -161,16 +161,16 @@ SKIP: {
     ok( $job->delete, "job deleted without error" );
 
     # submit expected timeout
-    #$job = $ua->submit_job(
-        #'tool'                => 'MAFFT_XSEDE',
-        #'input.infile_'       => ["t/test_data/timeout.fa"],
-        #'vparam.runtime_'     => '0.1',
-        #'vparam.analysis_type_' => 'accurate',
-        #'vparam.auto_analysis_' => '0',
-    #);
-    #ok( $job->wait(1200), "wait() returned true" );
-    #ok( $job->timed_out(), "job timed out" );
-    #$job->delete;
+    $job = $ua->submit_job(
+        'tool'                => 'MAFFT_XSEDE',
+        'input.infile_'       => ["t/test_data/timeout.fa"],
+        'vparam.runtime_'     => '0.1',
+        'vparam.analysis_type_' => 'accurate',
+        'vparam.auto_analysis_' => '0',
+    );
+    ok( $job->wait(1200), "wait() returned true" );
+    ok( $job->timed_out(), "job timed out" );
+    $job->delete;
 
 }
 
