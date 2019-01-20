@@ -131,6 +131,23 @@ sub exit_code {
        
 }
 
+sub timed_out {
+
+    my ($self) = @_;
+
+    my ($file) = $self->outputs(name => '_scheduler_stderr.txt');
+
+    return undef if (! defined $file);
+
+    my $content = $file->download;
+    if ($content =~ /CANCELLED AT \S+ DUE TO TIME LIMIT/) {
+        return 1;
+    }
+  
+    return 0;
+       
+}
+
 sub stdout {
 
     my ($self) = @_;
@@ -252,7 +269,7 @@ Bio::CIPRES::Job - a CIPRES job class
 
     $job->wait(6000) or die "Timeout waiting for job completion";
 
-    warn "Job returned non-zero status" if ($job->exit_code != 0);
+    warn "Job returned non-zero status" if ($job->exit_code);
 
     print STDOUT $job->stdout;
     print STDERR $job->stderr;
@@ -353,6 +370,16 @@ generally doesn't need to be set by the user. (default: false)
 Returns the actual exit code of the job on the remote server. Exit codes < 0
 indicate API or server errors, while exit codes > 0 indicate errors in the job
 tool itself (possibly described in the tool's documentation).
+
+=item B<timed_out>
+
+    warn "Job timed out on remote scheduler" if ($job->timed_out);
+
+Returns true if the job timed out according to the remote scheduler, false if
+it did not, and undefined if unable to be determined. Note that the method for
+detecting such state relies on parsing STDERR text and may be subject to false
+negatives. A true return value is thus relatively reliable, while a false
+value should not be strictly relied upon for any critical purposes.
 
 =item B<stdout>
 

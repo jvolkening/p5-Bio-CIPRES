@@ -84,7 +84,7 @@ SKIP: {
     ok( $@, "get_job() threw expected exception" );
     isa_ok( $@, 'Bio::CIPRES::Error' );
     cmp_ok( $@,  '==', ERR_NOT_FOUND, "exception == ERR_NOT_FOUND");
-    cmp_ok( "$@",  'eq', "Job not found.", "exception == ERR_NOT_FOUND");
+    cmp_ok( "$@",  'eq', "Job not found.\n", "exception eq 'Job not found'");
 
     # submit bad job
     eval {
@@ -125,6 +125,7 @@ SKIP: {
     cmp_ok( $job->exit_code, '==', 0, "job return expected exit status" );
 
     ok(! $job->is_failed, "job not failed" );
+    ok(! $job->timed_out, "job not timed out" );
 
     # test Bio::CIPRES::Message
     my $msg = $job->messages()->[-1];
@@ -158,6 +159,19 @@ SKIP: {
 
     # try to clean up
     ok( $job->delete, "job deleted without error" );
+
+    # submit expected timeout
+    $job = $ua->submit_job(
+        'tool'                => 'MAFFT_XSEDE',
+        'input.infile_'       => ["t/test_data/timeout.fa"],
+        'vparam.runtime_'     => '0.1',
+        'vparam.analysis_type_' => 'accurate',
+        'vparam.auto_analysis_' => '0',
+    );
+    ok( $job->wait(1200), "wait() returned true" );
+    ok( $job->timed_out(), "job timed out" );
+    $job->delete;
+
 }
 
 done_testing();

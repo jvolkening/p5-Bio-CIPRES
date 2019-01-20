@@ -1,13 +1,16 @@
 Revision history for Bio-CIPRES
 
+0.005    2019-01-20
+         Added 'Bio::CIPRES::Job::timed_out()'
+
 0.004004 2019-01-03
-         Add 'run_cipres' tool
+         Added 'run_cipres' tool
 
 0.004003 2018-09-12
-         Remove inadvertent debug msg in STDOUT
+         Removed inadvertent debug msg in STDOUT
 
 0.004002 2018-09-10
-         Fix credential encoding bug
+         Fixed credential encoding bug
 
 0.004001 2018-09-01
          Improved checks and safeguards on file downloads

@@ -15,7 +15,7 @@ use XML::LibXML;
 use Bio::CIPRES::Job;
 use Bio::CIPRES::Error;
 
-our $VERSION = '0.004004';
+our $VERSION = '0.005';
 our $SERVER  = 'cipresrest.sdsc.edu';
 our $API     = 'cipresrest/v1';
 our $DOMAIN  = 'Cipres Authentication';

@@ -61,9 +61,11 @@ sub _stringify {
 
     my ($self) = @_;
 
-    return join ' : ', $self->{display},
+    my $msg = join ' : ', $self->{display},
         map {"Error in param \"$_->{param}\" ($_->{error})"}
         @{ $self->{param_errors} };
+
+    return "$msg\n";
 
 }
 
