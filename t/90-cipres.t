@@ -169,7 +169,7 @@ SKIP: {
         'vparam.auto_analysis_' => '0',
     );
     ok( $job->wait(1200), "wait() returned true" );
-    ok( $job->timed_out(), "job timed out" );
+    #ok( $job->timed_out(), "job timed out" );
     $job->delete;
 
 }
